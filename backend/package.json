@@ -1,0 +1,14 @@
+{
+  "name": "drawio-backend",
+  "version": "1.0.0",
+  "description": "Backend server to serve draw.io static files",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "fast-xml-parser": "^4.x.x",
+    "mongoose": "^9.0.2"
+  }
+}

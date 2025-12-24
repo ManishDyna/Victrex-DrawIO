@@ -1,0 +1,19 @@
+import base64
+import zlib
+import urllib.parse
+
+encoded = """7VhNj5swEP01OfTQCkJI2+NCd9tKabtq+qEeZ2EC3hqGGmeT9Nd3DCaEJZtmo1D1sFIUeZ5njHnvAbZHXpit3yoo0g8UoxyNnXg98t6MxuOX/kv+N8CmBjzPr4FEibiG3BaYi99oQceiSxFj2UnURFKLogtGlOcY6Q4GStGqm7Yg2b1qAQn2gHkEso9+F7FOa/SV77T4OxRJ2lzZdWxPBk2yBcoUYlrtQN7lyAsVka5b2TpEabhreKnrrh7o3U5MYa6PKbhV375qBT/CH9/ff7y9m+GvLHu+ZxQLlXrTcKBomcdohnFGXrBKhcZ5AZHpXbHojKU6kxy53Kyr70AuGwafcfz56tr8o1YCuW80nkq+XBCLO24mpjk2aZcZCDPnL0okCaomjW9qJ3NPsWeK5xr0suRGmELOqj5QXE0Plcb1zv1ayt4iZTzHDaekO6pOrYSr1gFuI+t6K3wdW5+7ExuDNWCyHbrViBtWpkdINj5GsnIlMgk5R8GCcj23PUa/KBUynsGGlqa61BD9bKIgJSV+cz40anK30vap9JxOxtxU2jEVlpxz3UzJvQd9gHUncQalbmZDUkJRiptqfqYwA5WIPCCtKTvRcjNKjInADHqK3q6/R/DJYcHH/lCCe33BDxljxwV8z7oSUdFPDEmSYjyn2hZCynsQSJHkHEpcmDJDmuA34YWFMxHHZuSgZCVEnsyqtDeTFvlsKTQQcflCVi+8lAuRRwgKErmu6PED/jFhofPCH/k815Bjt435Z9KVDinn6YOo7hzZNys03gkU8dMON1tXP9Yi1QvpBGt4B5yx6aac3QiTJyMMYIT2m7T9ggzji+lQvvCffHF+XzRLkWE98XooT0yfPDGcJ0rDqdmIDGWL7ery7L5wreAY9/Y9/fUkLVWEhwZzeu4x4zarTVYipYRykJctGnR3E23OjKiwxN+i1hu76oQl07xHFl6YJnjI2a7b02+/NgolaHHXpeP8xDsP87xvq+We4M/rDZOZm5dWpEShT3LnEXud8at7bh1s6etOzunWPt3/kVu9/8utRx0MlCkUplkoirAs/+7YG94yJhWln5ZairzZ83Vt32NifmFODy6UuIGhPD35d57es587QC0okBIlJQoy83lDJXgeqO73Xbcdf1NhIdbYHLUdwf5QlE/PQDmH7Qla1bdzDOld/gE="""
+
+# Step 1: Base64 decode
+compressed = base64.b64decode(encoded)
+
+# Step 2: Inflate (raw deflate)
+xml_bytes = zlib.decompress(compressed, -15)
+
+# Step 3: URL decode
+diagram_xml = urllib.parse.unquote(xml_bytes.decode("utf-8"))
+
+# print(diagram_xml)
+# 4. Save output XML
+with open("decoded_diagram.xml", "w", encoding="utf-8") as f:
+    f.write(diagram_xml)
