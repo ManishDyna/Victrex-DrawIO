@@ -278,22 +278,21 @@ function EditorPage() {
     // Determine if this is a new file upload or editing existing diagram
     const isNewFile = isNewFileUpload || !lastSavedId;
     
-    // Ask user for a human-friendly name (fallback to timestamp)
-    // If editing existing, show current name; if new file, show default
-    const currentName = lastSavedId ? (processList.find(p => p.id === lastSavedId)?.name || '') : '';
-    const defaultName = isNewFile 
-      ? (pendingFile?.fileName?.replace(/\.[^/.]+$/, '') || `Diagram ${new Date().toLocaleString()}`)
-      : currentName || `Diagram ${new Date().toLocaleString()}`;
-    const name = window.prompt(
-      isNewFile 
-        ? 'Enter a name for this new diagram:' 
-        : 'Enter a name for this diagram (or keep current):',
-      defaultName
-    );
+    let name;
+    
+    // If saving an existing file, use the existing name without prompting
+    if (!isNewFile && lastSavedId) {
+      const existingProcess = processList.find(p => p.id === lastSavedId);
+      name = existingProcess?.name || `Diagram ${new Date().toLocaleString()}`;
+    } else {
+      // For new files, ask user for a human-friendly name
+      const defaultName = pendingFile?.fileName?.replace(/\.[^/.]+$/, '') || `Diagram ${new Date().toLocaleString()}`;
+      name = window.prompt('Enter a name for this new diagram:', defaultName);
 
-    if (!name) {
-      setIsSaving(false);
-      return;
+      if (!name) {
+        setIsSaving(false);
+        return;
+      }
     }
 
     try {
@@ -367,12 +366,17 @@ function EditorPage() {
       
       loadProcessList();
       
-      // Show success message with parsing info
-      const parsedInfo = data.parsedData 
-        ? ` (${data.parsedData.nodes?.length || 0} nodes, ${data.parsedData.connections?.length || 0} connections)`
-        : ' (parsing failed - check server logs)';
-      const saveType = isNewFile ? 'created' : 'updated';
-      alert(`Diagram ${saveType} in MongoDB${parsedInfo}.`);
+      // Show success message
+      if (!isNewFile) {
+        // For existing files, show simple "File saved" message
+        alert('File saved successfully!');
+      } else {
+        // For new files, show detailed message with parsing info
+        const parsedInfo = data.parsedData 
+          ? ` (${data.parsedData.nodes?.length || 0} nodes, ${data.parsedData.connections?.length || 0} connections)`
+          : ' (parsing failed - check server logs)';
+        alert(`Diagram created in MongoDB${parsedInfo}.`);
+      }
     } catch (err) {
       console.error(err);
       alert('Failed to save diagram.');
