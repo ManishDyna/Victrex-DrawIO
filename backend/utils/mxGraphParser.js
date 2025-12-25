@@ -382,17 +382,52 @@ function parseMxGraphXml(xml, defaultDiagramId = 'Page-1') {
     // PRIORITY: If it has source and target, it's ALWAYS a connection/edge
     // This handles manually created connections in draw.io that might not have edge="1"
     if (hasSourceAndTarget) {
+      // Extract style and connector properties
+      const style = actualCell.style || cell.style || '';
+      const geom = actualCell.mxGeometry || cell.mxGeometry || {};
+      
+      // Parse style properties
+      const parseStyleProperty = (styleStr, prop) => {
+        const regex = new RegExp(`${prop}=([^;]+)`, 'i');
+        const match = styleStr.match(regex);
+        return match ? match[1] : null;
+      };
+      
       const connection = {
         from: String(source), // Ensure string IDs for consistency
         to: String(target),
+        id: String(cellId),
+        style: style, // Store full style string
+        // Extract individual properties for easier access
+        strokeWidth: parseStyleProperty(style, 'strokeWidth') ? parseFloat(parseStyleProperty(style, 'strokeWidth')) : undefined,
+        strokeColor: parseStyleProperty(style, 'strokeColor') || undefined,
+        endArrow: parseStyleProperty(style, 'endArrow') || undefined,
+        startArrow: parseStyleProperty(style, 'startArrow') || undefined,
+        dashed: parseStyleProperty(style, 'dashed') === '1' || style.toLowerCase().includes('dashed=1'),
+        dashPattern: parseStyleProperty(style, 'dashPattern') || undefined,
       };
       connections.push(connection);
       edgeDebugLog.push(`✅ Edge found (source+target): ${connection.from} -> ${connection.to} (cell id=${cellId}, edge=${edgeValue}, vertex=${vertexValue})`);
     } else if (isExplicitEdge && source && target) {
       // Fallback: explicit edge attribute with source/target
+      const style = actualCell.style || cell.style || '';
+      const parseStyleProperty = (styleStr, prop) => {
+        const regex = new RegExp(`${prop}=([^;]+)`, 'i');
+        const match = styleStr.match(regex);
+        return match ? match[1] : null;
+      };
+      
       const connection = {
         from: String(source),
         to: String(target),
+        id: String(cellId),
+        style: style,
+        strokeWidth: parseStyleProperty(style, 'strokeWidth') ? parseFloat(parseStyleProperty(style, 'strokeWidth')) : undefined,
+        strokeColor: parseStyleProperty(style, 'strokeColor') || undefined,
+        endArrow: parseStyleProperty(style, 'endArrow') || undefined,
+        startArrow: parseStyleProperty(style, 'startArrow') || undefined,
+        dashed: parseStyleProperty(style, 'dashed') === '1' || style.toLowerCase().includes('dashed=1'),
+        dashPattern: parseStyleProperty(style, 'dashPattern') || undefined,
       };
       connections.push(connection);
       edgeDebugLog.push(`✅ Edge found (explicit edge attr): ${connection.from} -> ${connection.to} (cell id=${cellId})`);

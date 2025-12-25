@@ -174,9 +174,22 @@ function updateDiagramXml(xml, updatedNodes) {
     });
     
     // Start subprocess IDs from maxId + 1000 to ensure they're unique
+    // Use a high starting point to avoid conflicts with draw.io's auto-assigned IDs
+    // Draw.io typically uses sequential IDs starting from 0, so we use much higher numbers
     let nextSubprocessId = Math.max(10000, maxId + 1000);
     // Start edge IDs from maxId + 2000 to ensure they're unique
     let nextEdgeId = Math.max(20000, maxId + 2000);
+    
+    // CRITICAL: Check if any of our planned IDs conflict with existing IDs
+    // If they do, start from a higher number
+    while (cellIdMap.has(String(nextSubprocessId))) {
+      nextSubprocessId++;
+      console.log(`   ⚠️  Subprocess ID conflict detected, using ${nextSubprocessId} instead`);
+    }
+    while (cellIdMap.has(String(nextEdgeId))) {
+      nextEdgeId++;
+      console.log(`   ⚠️  Edge ID conflict detected, using ${nextEdgeId} instead`);
+    }
     
     console.log(`   🔢 Max existing ID: ${maxId}, Starting subprocess IDs from: ${nextSubprocessId}, Starting edge IDs from: ${nextEdgeId}`);
     
@@ -186,7 +199,8 @@ function updateDiagramXml(xml, updatedNodes) {
       const parentPos = nodePositionMap.get(String(node.id)) || { x: 0, y: 0 };
       const parentWidth = 120;
       const parentHeight = 60;
-      const spacing = 30; // Spacing between parent and subprocesses
+      const minSpacing = 100; // Minimum spacing for visible connectors
+      const spacing = Math.max(30, minSpacing); // Spacing between parent and subprocesses (minimum 100px for visibility)
       const subprocessSpacing = 80; // Vertical spacing between multiple subprocesses
       
       node.subprocesses.forEach((subprocess, index) => {
@@ -196,7 +210,55 @@ function updateDiagramXml(xml, updatedNodes) {
         
         if (!subprocessObj.name || !subprocessObj.name.trim()) return;
         
-        const subprocessId = nextSubprocessId++;
+        // Check if a subprocess node with this name already exists in the XML
+        // This handles cases where draw.io has already created/reassigned the node
+        // We need to check BOTH formats:
+        // 1. UserObject wrapped: <UserObject><mxCell id="X" value="..."></mxCell></UserObject>
+        // 2. Plain mxCell: <mxCell id="X" value="..."></mxCell>
+        const escapedNameForSearch = subprocessObj.name
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+        
+        // Search for existing node with this name - look for the value attribute containing the name
+        const nameInValue = `&lt;div&gt;&lt;p&gt;${escapedNameForSearch}&lt;/p&gt;&lt;/div&gt;`;
+        const escapedValue = nameInValue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        
+        // Pattern 1: UserObject wrapped node
+        const userObjectPattern = new RegExp(`<UserObject[^>]*>\\s*<mxCell[^>]*id="([^"]+)"[^>]*value="${escapedValue}"[^>]*vertex="1"`, 'i');
+        // Pattern 2: Plain mxCell (not wrapped in UserObject)
+        const plainMxCellPattern = new RegExp(`<mxCell[^>]*id="([^"]+)"[^>]*value="${escapedValue}"[^>]*vertex="1"`, 'i');
+        
+        const userObjectMatch = decodedXml.match(userObjectPattern);
+        const plainCellMatch = decodedXml.match(plainMxCellPattern);
+        
+        let subprocessId;
+        let shouldCreateNode = true;
+        
+        // Check both patterns - prefer UserObject match first, then plain mxCell
+        if (userObjectMatch && userObjectMatch[1]) {
+          subprocessId = userObjectMatch[1];
+          shouldCreateNode = false;
+          console.log(`   🔄 Found existing UserObject-wrapped subprocess node "${subprocessObj.name}" with ID ${subprocessId}, reusing it`);
+        } else if (plainCellMatch && plainCellMatch[1]) {
+          subprocessId = plainCellMatch[1];
+          shouldCreateNode = false;
+          console.log(`   🔄 Found existing plain mxCell subprocess node "${subprocessObj.name}" with ID ${subprocessId}, reusing it`);
+        } else {
+          // Create new node with unique ID
+          subprocessId = nextSubprocessId++;
+          // Ensure ID doesn't conflict
+          while (cellIdMap.has(String(subprocessId))) {
+            subprocessId = nextSubprocessId++;
+            console.log(`   ⚠️  ID conflict, using ${subprocessId} instead`);
+          }
+          console.log(`   ✨ Creating new subprocess node "${subprocessObj.name}" with ID ${subprocessId}`);
+        }
+        
+        // CRITICAL: Add subprocess ID to cellIdMap so edges can reference it
+        cellIdMap.set(String(subprocessId), true);
+        
         // Position subprocesses to the right of parent, vertically aligned
         const subprocessX = parentPos.x + parentWidth + spacing;
         const subprocessY = parentPos.y + (index * subprocessSpacing);
@@ -227,17 +289,21 @@ function updateDiagramXml(xml, updatedNodes) {
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;');
         
-        // Create XML string for subprocess cell matching the UserObject format
-        const subprocessXml = `<UserObject label="&lt;div&gt;&lt;p&gt;${escapedName}&lt;/p&gt;&lt;/div&gt;"><mxCell id="${subprocessId}" value="&lt;div&gt;&lt;p&gt;${escapedName}&lt;/p&gt;&lt;/div&gt;" style="${style}" vertex="1" parent="1"><mxGeometry x="${subprocessX}" y="${subprocessY}" width="120" height="60" as="geometry"/></mxCell></UserObject>`;
-        subprocessNodesXml.push(subprocessXml);
+        // Only create the node if it doesn't already exist
+        if (shouldCreateNode) {
+          // Create XML string for subprocess cell - use simple mxCell format (not UserObject)
+          // This matches the format of existing simple nodes and prevents ID reassignment
+          // Format: <mxCell id="..." parent="1" style="..." value="..." vertex="1">
+          const subprocessXml = `<mxCell id="${subprocessId}" parent="1" style="${style}" value="&lt;div&gt;&lt;p&gt;${escapedName}&lt;/p&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry x="${subprocessX}" y="${subprocessY}" width="120" height="60" as="geometry" />
+        </mxCell>`;
+          subprocessNodesXml.push(subprocessXml);
+          console.log(`   ✅ Created subprocess node: ${subprocessObj.name} (ID: ${subprocessId}) at (${subprocessX}, ${subprocessY})`);
+        } else {
+          console.log(`   ⏭️  Skipped creating subprocess node "${subprocessObj.name}" - already exists with ID ${subprocessId}`);
+        }
         
-        // Create edge/connection from parent node to subprocess
-        // Edge style: dashed line with arrow to indicate subprocess relationship
-        const edgeId = nextEdgeId++;
-        // Use a more visible dashed arrow style - thicker line, blue color, larger arrow
-        // exitX=1 (right), exitY=0.5 (middle), entryX=0 (left), entryY=0.5 (middle)
-        const edgeStyle = 'endArrow=classic;html=1;rounded=0;strokeWidth=2.5;strokeColor=#0066CC;dashed=1;dashPattern=8 4;endSize=10;endFill=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;';
-        
+        // IMPORTANT: Get source ID BEFORE checking for existing edges
         // Verify source ID exists in XML
         const sourceId = String(node.id);
         if (!cellIdMap.has(sourceId)) {
@@ -272,44 +338,84 @@ function updateDiagramXml(xml, updatedNodes) {
           console.warn(`   ⚠️  Source ID ${sourceId} not found as mxCell ID, but will try anyway`);
         }
         
-        // Create edge - match the format of existing edges exactly
-        // Use the example edge format if available, otherwise use standard format
-        let edgeXml;
-        if (edgeFormatExample) {
-          // Extract the basic structure from example, but use our custom style
-          // The example shows us the exact attribute order and format
-          edgeXml = `<mxCell id="${edgeId}" value="" style="${edgeStyle}" edge="1" parent="1" source="${actualSourceId}" target="${subprocessId}"><mxGeometry relative="1" as="geometry"/></mxCell>`;
-          console.log(`   📋 Using example edge format as reference`);
-        } else {
-          // Standard edge format - ensure all required attributes are present
-          edgeXml = `<mxCell id="${edgeId}" value="" style="${edgeStyle}" edge="1" parent="1" source="${actualSourceId}" target="${subprocessId}"><mxGeometry relative="1" as="geometry"/></mxCell>`;
-        }
+        // ALWAYS create a NEW connector for subprocesses - never modify existing connectors
+        // Each subprocess should have its own dedicated connector arrow from the parent node
+        // We don't check for existing edges - we always create a fresh one
+        console.log(`   🔗 Creating NEW connector from parent node ${actualSourceId} to subprocess ${subprocessObj.name} (${subprocessId})`);
         
-        subprocessEdgesXml.push(edgeXml);
-        
-        // Log the full edge XML for debugging
-        console.log(`   🔗 Edge XML (full): ${edgeXml}`);
-        console.log(`   🔗 Source ID: "${actualSourceId}", Target ID: "${subprocessId}"`);
-        
-        // Verify source ID exists in cellIdMap
-        if (!cellIdMap.has(actualSourceId)) {
-          console.warn(`   ⚠️  WARNING: Source ID "${actualSourceId}" not found in cellIdMap!`);
-          console.warn(`   ⚠️  Available IDs: ${Array.from(cellIdMap.keys()).slice(0, 15).join(', ')}`);
-          console.warn(`   ⚠️  Edge may not render correctly.`);
-        } else {
-          console.log(`   ✅ Source ID "${actualSourceId}" verified in cellIdMap`);
-        }
-        
-        console.log(`   ✅ Created subprocess: ${subprocessObj.name} (ID: ${subprocessId}) connected to node ${sourceId} via edge ${edgeId}`);
-        
-        // If there are multiple subprocesses, connect them with arrows too
-        if (index > 0) {
-          const prevSubprocessId = nextSubprocessId - (node.subprocesses.length - index);
-          const connectorEdgeId = nextEdgeId++;
-          const connectorStyle = 'endArrow=classic;html=1;rounded=0;strokeWidth=2;strokeColor=#999999;dashed=1;dashPattern=4 4;endSize=8;endFill=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;';
-          const connectorXml = `<mxCell id="${connectorEdgeId}" value="" style="${connectorStyle}" edge="1" parent="1" source="${prevSubprocessId}" target="${subprocessId}"><mxGeometry relative="1" as="geometry"/></mxCell>`;
-          subprocessEdgesXml.push(connectorXml);
-          console.log(`   ✅ Created connector between subprocesses: ${prevSubprocessId} -> ${subprocessId} via edge ${connectorEdgeId}`);
+        // Create edge/connection from parent node to subprocess
+        {
+          // Create edge/connection from parent node to subprocess
+          // Edge style: solid black line with arrow (same as regular connectors)
+          const edgeId = nextEdgeId++;
+          // Use standard black connector style matching regular diagram connectors
+          // exitX=1 (right), exitY=0.5 (middle), entryX=0 (left), entryY=0.5 (middle)
+          const edgeStyle = 'edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;';
+          
+          // Create edge - match the format of existing edges exactly
+          // CRITICAL: Ensure target ID matches the subprocess node ID exactly (could be existing ID like "13" or new ID)
+          
+          // Verify both source and target IDs exist
+          const sourceExists = cellIdMap.has(actualSourceId);
+          const targetExists = cellIdMap.has(String(subprocessId));
+          
+          if (!sourceExists) {
+            console.warn(`   ⚠️  WARNING: Source ID "${actualSourceId}" not found in cellIdMap!`);
+            console.warn(`   ⚠️  Available IDs: ${Array.from(cellIdMap.keys()).slice(0, 15).join(', ')}`);
+          } else {
+            console.log(`   ✅ Source ID "${actualSourceId}" verified in cellIdMap`);
+          }
+          
+          if (!targetExists) {
+            console.warn(`   ⚠️  WARNING: Target ID "${subprocessId}" not found in cellIdMap! This should not happen.`);
+          } else {
+            console.log(`   ✅ Target ID "${subprocessId}" verified in cellIdMap`);
+          }
+          
+          // Create edge XML with explicit geometry points to ensure visible length
+          // Calculate waypoints to make the connector visible and properly routed
+          // The connector should go from parent node (right side) to subprocess node (left side)
+          // Add intermediate waypoints to ensure the connector is visible
+          const subprocessHeight = 60; // Standard subprocess node height
+          const waypointX1 = parentPos.x + parentWidth + 20; // 20px to the right of parent
+          const waypointY1 = parentPos.y + (parentHeight / 2); // Middle of parent
+          const waypointX2 = subprocessX - 20; // 20px to the left of subprocess
+          const waypointY2 = subprocessY + (subprocessHeight / 2); // Middle of subprocess
+          
+          // Create edge XML with waypoints to ensure visible connector
+          // Format: id, value, style, edge, parent, source, target, then geometry with waypoints
+          const edgeXml = `<mxCell id="${edgeId}" value="" style="${edgeStyle}" edge="1" parent="1" source="${actualSourceId}" target="${subprocessId}">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="${waypointX1}" y="${waypointY1}" />
+              <mxPoint x="${waypointX2}" y="${waypointY2}" />
+            </Array>
+          </mxGeometry>
+        </mxCell>`;
+          
+          subprocessEdgesXml.push(edgeXml);
+          
+          // Log the full edge XML for debugging
+          console.log(`   🔗 Edge XML (full): ${edgeXml}`);
+          console.log(`   🔗 Source ID: "${actualSourceId}", Target ID: "${subprocessId}", Edge ID: "${edgeId}"`);
+          console.log(`   ✅ Created NEW edge connecting node ${sourceId} -> subprocess ${subprocessObj.name} (${subprocessId}) via edge ${edgeId}`);
+          
+          // If there are multiple subprocesses, connect them with arrows too
+          if (index > 0) {
+            // Calculate previous subprocess ID (the one created before this one)
+            const prevSubprocessId = nextSubprocessId - (node.subprocesses.length - index + 1);
+            
+            // Verify previous subprocess ID exists
+            if (cellIdMap.has(String(prevSubprocessId))) {
+              const connectorEdgeId = nextEdgeId++;
+              const connectorStyle = 'edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;';
+              const connectorXml = `<mxCell id="${connectorEdgeId}" value="" style="${connectorStyle}" edge="1" parent="1" source="${prevSubprocessId}" target="${subprocessId}"><mxGeometry relative="1" as="geometry"/></mxCell>`;
+              subprocessEdgesXml.push(connectorXml);
+              console.log(`   ✅ Created connector between subprocesses: ${prevSubprocessId} -> ${subprocessId} via edge ${connectorEdgeId}`);
+            } else {
+              console.warn(`   ⚠️  Previous subprocess ID ${prevSubprocessId} not found, skipping connector`);
+            }
+          }
         }
       });
     });
@@ -344,8 +450,11 @@ function updateDiagramXml(xml, updatedNodes) {
           console.log(`   📍 Inserting subprocesses before </root> at position ${insertIndex}`);
         }
         
+        // Insert subprocess XML - nodes first, then edges
+        // Add a newline for readability (draw.io can handle it)
+        const subprocessXmlString = '\n    ' + subprocessXmlParts.join('\n    ') + '\n  ';
         updatedXml = updatedXml.substring(0, insertIndex) + 
-                     subprocessXmlParts.join('') + 
+                     subprocessXmlString + 
                      updatedXml.substring(insertIndex);
         console.log(`   ✅ Inserted ${nodesCount} subprocess nodes and ${edgesCount} edges into XML`);
         console.log(`   📊 Total subprocess elements: ${subprocessXmlParts.length}`);
@@ -354,14 +463,33 @@ function updateDiagramXml(xml, updatedNodes) {
         const edgeCountInXml = (updatedXml.match(/edge="1"/g) || []).length;
         console.log(`   🔍 Total edges in XML after insertion: ${edgeCountInXml}`);
         
-        // Verify the edge we created is in the XML
+        // Verify each edge we created is in the XML
         if (subprocessEdgesXml.length > 0) {
-          const firstEdgeId = subprocessEdgesXml[0].match(/id="(\d+)"/)?.[1];
-          if (firstEdgeId && updatedXml.includes(`id="${firstEdgeId}"`)) {
-            console.log(`   ✅ Verified edge ${firstEdgeId} is present in XML`);
-          } else {
-            console.warn(`   ⚠️  Edge ${firstEdgeId} might not be in XML correctly`);
-          }
+          console.log(`   🔍 Verifying ${subprocessEdgesXml.length} subprocess edges in XML...`);
+          subprocessEdgesXml.forEach((edgeXml, idx) => {
+            const edgeId = edgeXml.match(/id="(\d+)"/)?.[1];
+            const sourceId = edgeXml.match(/source="([^"]+)"/)?.[1];
+            const targetId = edgeXml.match(/target="([^"]+)"/)?.[1];
+            
+            if (edgeId && updatedXml.includes(`id="${edgeId}"`)) {
+              console.log(`   ✅ Edge ${idx + 1}/${subprocessEdgesXml.length}: ID ${edgeId} (${sourceId} -> ${targetId}) verified in XML`);
+            } else {
+              console.warn(`   ⚠️  Edge ${idx + 1}/${subprocessEdgesXml.length}: ID ${edgeId} NOT found in XML!`);
+            }
+          });
+        }
+        
+        // Verify subprocess nodes are also present
+        if (subprocessNodesXml.length > 0) {
+          console.log(`   🔍 Verifying ${subprocessNodesXml.length} subprocess nodes in XML...`);
+          subprocessNodesXml.forEach((nodeXml, idx) => {
+            const nodeId = nodeXml.match(/id="(\d+)"/)?.[1];
+            if (nodeId && updatedXml.includes(`id="${nodeId}"`)) {
+              console.log(`   ✅ Node ${idx + 1}/${subprocessNodesXml.length}: ID ${nodeId} verified in XML`);
+            } else {
+              console.warn(`   ⚠️  Node ${idx + 1}/${subprocessNodesXml.length}: ID ${nodeId} NOT found in XML!`);
+            }
+          });
         }
         
         // CRITICAL: Ensure all existing edges (manually created) are preserved

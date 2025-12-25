@@ -221,6 +221,28 @@ function EditorPage() {
       return;
     }
 
+    // Debug: Check for edges in exported XML (for manually created connections)
+    // Note: If XML is compressed, edges will be in base64, so we need to check after decompression
+    const isCompressed = xml.includes('<diagram') && !xml.includes('<mxGraphModel>');
+    let edgeCount = 0;
+    let sourceTargetCount = 0;
+    
+    if (isCompressed) {
+      // For compressed XML, we can't easily count edges in the base64 string
+      // But we can check if the diagram tag has content
+      const diagramMatch = xml.match(/<diagram[^>]*>([\s\S]*?)<\/diagram>/);
+      if (diagramMatch && diagramMatch[1].trim().length > 0) {
+        console.log('📦 Exported XML is compressed (base64). Edges will be counted after decompression.');
+      }
+    } else {
+      // For uncompressed XML, count edges directly
+      edgeCount = (xml.match(/edge="1"/g) || []).length;
+      sourceTargetCount = (xml.match(/source="[^"]+"/g) || []).length;
+      console.log(`🔗 Exported XML edge check (uncompressed): ${edgeCount} edges, ${sourceTargetCount} cells with source`);
+    }
+    
+    console.log(`💾 Export received: XML length=${xml.length}, compressed=${isCompressed}`);
+
     setLastExportedXml(xml);
 
     // If we're converting an uploaded file, reload with compressed XML

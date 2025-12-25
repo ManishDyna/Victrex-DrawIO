@@ -44,12 +44,18 @@ function FormView() {
         
         // Initialize nodes with editable content
         if (data.parsedData?.nodes) {
-          const editableNodes = data.parsedData.nodes.map(node => ({
-            ...node,
-            editedLabel: extractTextFromHtml(node.label || ''),
-            owner: node.owner || '',
-            subprocesses: node.subprocesses || [],
-          }));
+          const editableNodes = data.parsedData.nodes.map(node => {
+            // Convert subprocesses to objects if they're strings
+            const processedSubprocesses = (node.subprocesses || []).map(sub => 
+              typeof sub === 'string' ? { name: sub, shape: 'rectangle' } : sub
+            );
+            return {
+              ...node,
+              editedLabel: extractTextFromHtml(node.label || ''),
+              owner: node.owner || '',
+              subprocesses: processedSubprocesses,
+            };
+          });
           setNodes(editableNodes);
           // Expand all nodes by default
           setExpandedNodes(new Set(editableNodes.map(n => n.id)));
@@ -106,15 +112,20 @@ function FormView() {
   };
 
   // Handle subprocess change
-  const handleSubprocessChange = (nodeId, subprocessIndex, value) => {
+  const handleSubprocessChange = (nodeId, subprocessIndex, field, value) => {
     setNodes(prevNodes =>
       prevNodes.map(node => {
         if (node.id === nodeId) {
           const newSubprocesses = [...(node.subprocesses || [])];
+          // Subprocesses are now objects with name and shape
           if (subprocessIndex >= 0 && subprocessIndex < newSubprocesses.length) {
-            newSubprocesses[subprocessIndex] = value;
+            const subprocess = typeof newSubprocesses[subprocessIndex] === 'string' 
+              ? { name: newSubprocesses[subprocessIndex], shape: 'rectangle' }
+              : newSubprocesses[subprocessIndex];
+            subprocess[field] = value;
+            newSubprocesses[subprocessIndex] = subprocess;
           } else {
-            newSubprocesses.push(value);
+            newSubprocesses.push({ name: '', shape: 'rectangle' });
           }
           return { ...node, subprocesses: newSubprocesses };
         }
@@ -128,7 +139,7 @@ function FormView() {
     setNodes(prevNodes =>
       prevNodes.map(node =>
         node.id === nodeId
-          ? { ...node, subprocesses: [...(node.subprocesses || []), ''] }
+          ? { ...node, subprocesses: [...(node.subprocesses || []), { name: '', shape: 'rectangle' }] }
           : node
       )
     );
@@ -158,6 +169,10 @@ function FormView() {
       const updatedNodes = nodes.map(node => ({
         ...node,
         label: textToHtml(node.editedLabel), // Convert back to HTML format
+        editedLabel: node.editedLabel, // Keep editedLabel for XML update
+        subprocesses: (node.subprocesses || []).map(sub => 
+          typeof sub === 'string' ? { name: sub, shape: 'rectangle' } : sub
+        ),
       }));
 
       const response = await fetch(`http://localhost:3001/api/diagrams/${id}`, {
@@ -181,7 +196,17 @@ function FormView() {
 
       const updated = await response.json();
       setDiagram(updated);
-      alert('Changes saved successfully!');
+      
+      // Show success message with connection info
+      const connectionCount = updated.parsedData?.connections?.length || 0;
+      const subprocessCount = updated.parsedData?.nodes?.reduce((sum, n) => 
+        sum + (n.subprocesses?.length || 0), 0) || 0;
+      
+      if (subprocessCount > 0) {
+        alert(`Changes saved successfully!\n\n${subprocessCount} subprocess(es) added.\n${connectionCount} total connection(s) in diagram.\n\nNote: Please reload the diagram in the editor to see the new connectors.`);
+      } else {
+        alert('Changes saved successfully!');
+      }
     } catch (err) {
       console.error(err);
       alert('Failed to save changes. Please try again.');
@@ -348,17 +373,26 @@ function FormView() {
   const nodesWithBranches = mainFlowNodes.map(node => {
     const branchNodesForThis = branchNodes.get(node.id) || [];
     // Add branch nodes as subprocesses if they're not already in subprocesses
-    const existingSubprocesses = node.subprocesses || [];
+    const existingSubprocesses = (node.subprocesses || []).map(sub => 
+      typeof sub === 'string' ? { name: sub, shape: 'rectangle' } : sub
+    );
+    
     const branchSubprocesses = branchNodesForThis.map(branch => {
       const label = extractTextFromHtml(branch.label || '');
-      return label || branch.id;
+      return {
+        name: label || branch.id,
+        shape: branch.shape || 'rectangle'
+      };
     });
     
-    // Merge but avoid duplicates
+    // Merge but avoid duplicates by name
     const allSubprocesses = [...existingSubprocesses];
-    branchSubprocesses.forEach(sub => {
-      if (!allSubprocesses.includes(sub)) {
-        allSubprocesses.push(sub);
+    branchSubprocesses.forEach(branchSub => {
+      const exists = allSubprocesses.some(existing => 
+        (typeof existing === 'string' ? existing : existing.name) === branchSub.name
+      );
+      if (!exists) {
+        allSubprocesses.push(branchSub);
       }
     });
 
@@ -531,32 +565,57 @@ function FormView() {
                         </label>
                         {node.subprocesses && node.subprocesses.length > 0 ? (
                           <div className="subprocesses-list">
-                            {node.subprocesses.map((subprocess, subIndex) => (
-                              <div key={subIndex} className="subprocess-item">
-                                <input
-                                  type="text"
-                                  value={subprocess}
-                                  onChange={(e) =>
-                                    handleSubprocessChange(
-                                      node.id,
-                                      subIndex,
-                                      e.target.value
-                                    )
-                                  }
-                                  placeholder="Subprocess"
-                                  className="form-input subprocess-input"
-                                />
-                                <button
-                                  type="button"
-                                  className="btn-remove"
-                                  onClick={() =>
-                                    handleRemoveSubprocess(node.id, subIndex)
-                                  }
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            ))}
+                            {node.subprocesses.map((subprocess, subIndex) => {
+                              const subprocessObj = typeof subprocess === 'string' 
+                                ? { name: subprocess, shape: 'rectangle' }
+                                : subprocess;
+                              return (
+                                <div key={subIndex} className="subprocess-item">
+                                  <input
+                                    type="text"
+                                    value={subprocessObj.name || ''}
+                                    onChange={(e) =>
+                                      handleSubprocessChange(
+                                        node.id,
+                                        subIndex,
+                                        'name',
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="Subprocess name"
+                                    className="form-input subprocess-input"
+                                  />
+                                  <select
+                                    value={subprocessObj.shape || 'rectangle'}
+                                    onChange={(e) =>
+                                      handleSubprocessChange(
+                                        node.id,
+                                        subIndex,
+                                        'shape',
+                                        e.target.value
+                                      )
+                                    }
+                                    className="form-select subprocess-shape"
+                                  >
+                                    <option value="rectangle">Rectangle</option>
+                                    <option value="ellipse">Circle/Ellipse</option>
+                                    <option value="decision">Decision/Diamond</option>
+                                    <option value="data">Data/Parallelogram</option>
+                                    <option value="document">Document</option>
+                                    <option value="subprocess">Subprocess</option>
+                                  </select>
+                                  <button
+                                    type="button"
+                                    className="btn-remove"
+                                    onClick={() =>
+                                      handleRemoveSubprocess(node.id, subIndex)
+                                    }
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              );
+                            })}
                           </div>
                         ) : (
                           <input

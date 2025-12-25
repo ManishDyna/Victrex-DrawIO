@@ -54,6 +54,16 @@ const diagramSchema = new mongoose.Schema(
         {
           from: { type: String },
           to: { type: String },
+          // Connector properties from VSDX/XML
+          style: { type: String }, // Full style string (strokeWidth, strokeColor, endArrow, etc.)
+          id: { type: String }, // Edge cell ID
+          // Extracted style properties for easier access
+          strokeWidth: { type: Number },
+          strokeColor: { type: String },
+          endArrow: { type: String },
+          startArrow: { type: String },
+          dashed: { type: Boolean },
+          dashPattern: { type: String },
         },
       ],
     },
