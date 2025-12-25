@@ -23,6 +23,7 @@ function EditorPage() {
   const [isConverting, setIsConverting] = useState(false);
   const [convertRequestId, setConvertRequestId] = useState(0);
   const [pendingFile, setPendingFile] = useState(null);
+  const [isNewFileUpload, setIsNewFileUpload] = useState(false); // Track if current diagram is from file upload
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -72,6 +73,10 @@ function EditorPage() {
           setDiagramXml(data.xml);
           setLastSavedId(data.id);
           setActiveProcessId(data.id);
+          // Clear new file flag - this is an existing diagram
+          setIsNewFileUpload(false);
+          // Clear pending file - not a new upload
+          setPendingFile(null);
         })
         .catch((err) => {
           console.error(err);
@@ -99,6 +104,11 @@ function EditorPage() {
 
     // Store file info for conversion
     setPendingFile({ file, fileName, isBinary });
+    // Mark as new file upload - this will always create new diagram
+    setIsNewFileUpload(true);
+    // Clear lastSavedId so it creates new diagram
+    setLastSavedId(null);
+    setActiveProcessId(null);
 
     if (isBinary) {
       // For VSDX/VSD files, read as ArrayBuffer and convert to base64 data URL
@@ -163,12 +173,14 @@ function EditorPage() {
           // Already compressed, load directly
           setDiagramXml(content);
           setLastSavedId(null);
-          setPendingFile(null);
+          setActiveProcessId(null);
+          // Don't clear pendingFile - keep it for save operation
         } else {
           // Needs conversion: load first, then export to get compressed version
           setIsConverting(true);
           setDiagramXml(content);
           setLastSavedId(null);
+          setActiveProcessId(null);
         }
       };
 
@@ -263,9 +275,21 @@ function EditorPage() {
     }
 
     // Otherwise, this is a save operation
+    // Determine if this is a new file upload or editing existing diagram
+    const isNewFile = isNewFileUpload || !lastSavedId;
+    
     // Ask user for a human-friendly name (fallback to timestamp)
-    const defaultName = `Diagram ${new Date().toLocaleString()}`;
-    const name = window.prompt('Enter a name for this diagram:', defaultName);
+    // If editing existing, show current name; if new file, show default
+    const currentName = lastSavedId ? (processList.find(p => p.id === lastSavedId)?.name || '') : '';
+    const defaultName = isNewFile 
+      ? (pendingFile?.fileName?.replace(/\.[^/.]+$/, '') || `Diagram ${new Date().toLocaleString()}`)
+      : currentName || `Diagram ${new Date().toLocaleString()}`;
+    const name = window.prompt(
+      isNewFile 
+        ? 'Enter a name for this new diagram:' 
+        : 'Enter a name for this diagram (or keep current):',
+      defaultName
+    );
 
     if (!name) {
       setIsSaving(false);
@@ -295,15 +319,20 @@ function EditorPage() {
       console.log('💾 Saving diagram to database:');
       console.log(`   - Name: ${name}`);
       console.log(`   - Source: ${sourceFileName || 'manual'}`);
+      console.log(`   - Is new file upload: ${isNewFile}`);
+      console.log(`   - Last saved ID: ${lastSavedId}`);
       console.log(`   - Diagram ID: ${diagramId || 'Page-1 (default)'}`);
       console.log(`   - XML length: ${xml.length} chars`);
-      console.log(`   - XML preview (first 200 chars): ${xml.substring(0, 200)}`);
-      console.log(`   - Has <mxfile>: ${xml.includes('<mxfile')}`);
-      console.log(`   - Has <diagram>: ${xml.includes('<diagram')}`);
-      console.log(`   - Has mxGraphModel: ${xml.includes('mxGraphModel')}`);
       
-      const res = await fetch('http://localhost:3001/api/diagrams', {
-        method: 'POST',
+      // If this is a new file upload OR no lastSavedId, always create new (POST)
+      // If editing existing diagram (has lastSavedId and NOT new file), update (PUT)
+      const url = (!isNewFile && lastSavedId)
+        ? `http://localhost:3001/api/diagrams/${lastSavedId}`
+        : 'http://localhost:3001/api/diagrams';
+      const method = (!isNewFile && lastSavedId) ? 'PUT' : 'POST';
+      
+      const res = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
         },
@@ -320,11 +349,21 @@ function EditorPage() {
       }
 
       const data = await res.json();
-      setLastSavedId(data.id);
-      setActiveProcessId(data.id);
       
-      // Clear pendingFile after successful save
-      setPendingFile(null);
+      // If this was a new file upload, mark it as saved but keep isNewFileUpload flag
+      // so subsequent saves will update the same diagram
+      if (isNewFile) {
+        setLastSavedId(data.id);
+        setActiveProcessId(data.id);
+        // Clear new file flag after first save - now it's an existing diagram
+        setIsNewFileUpload(false);
+        // Clear pendingFile after successful save
+        setPendingFile(null);
+      } else {
+        // Updating existing diagram - keep the same ID
+        setLastSavedId(data.id);
+        setActiveProcessId(data.id);
+      }
       
       loadProcessList();
       
@@ -332,7 +371,8 @@ function EditorPage() {
       const parsedInfo = data.parsedData 
         ? ` (${data.parsedData.nodes?.length || 0} nodes, ${data.parsedData.connections?.length || 0} connections)`
         : ' (parsing failed - check server logs)';
-      alert(`Diagram saved to MongoDB${parsedInfo}.`);
+      const saveType = isNewFile ? 'created' : 'updated';
+      alert(`Diagram ${saveType} in MongoDB${parsedInfo}.`);
     } catch (err) {
       console.error(err);
       alert('Failed to save diagram.');
@@ -389,6 +429,10 @@ function EditorPage() {
         setDiagramXml(data.xml);
         setLastSavedId(data.id);
         setActiveProcessId(data.id);
+        // Clear new file flag - this is an existing diagram
+        setIsNewFileUpload(false);
+        // Clear pending file - not a new upload
+        setPendingFile(null);
       })
       .catch((err) => {
         console.error(err);

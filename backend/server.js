@@ -46,8 +46,9 @@ const diagramSchema = new mongoose.Schema(
           owner: { type: String }, // Owner name for this specific step
           subprocesses: [{
             name: { type: String },
-            shape: { type: String, default: 'rectangle' }
-          }], // Subprocesses with name and shape
+            shape: { type: String, default: 'rectangle' },
+            parent: { type: String, default: 'main' } // 'main' for main step, or 'subprocess-{index}' for previous subprocess
+          }], // Subprocesses with name, shape, and parent connection
         },
       ],
       connections: [
@@ -127,6 +128,108 @@ const DRAWIO_WEBAPP_PATH = path.join(
 app.use(express.static(DRAWIO_WEBAPP_PATH));
 
 // ---- REST API for diagrams -----------------------------------------------
+
+/**
+ * PUT /api/diagrams/:id
+ * Updates an existing diagram's XML (used when editor saves).
+ * Re-parses the XML to update parsedData.
+ */
+app.put('/api/diagrams/:id', async (req, res) => {
+  try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ 
+        error: 'Database not connected. Please check MongoDB connection.' 
+      });
+    }
+
+    const { id } = req.params;
+    const { xml, name } = req.body || {};
+
+    if (!xml) {
+      return res.status(400).json({
+        error: '"xml" field is required.',
+      });
+    }
+
+    const doc = await Diagram.findById(id);
+    if (!doc) {
+      return res.status(404).json({ error: 'Diagram not found.' });
+    }
+
+    // Update XML
+    doc.xml = xml;
+    if (name) {
+      doc.name = name;
+    }
+
+    // Re-parse XML to update parsedData
+    // IMPORTANT: Preserve existing parsedData fields (like owner, subprocesses) that aren't in XML
+    try {
+      const diagramId = doc.parsedData?.diagramId || 'Page-1';
+      const freshParsedData = parseMxGraphXml(xml, diagramId);
+      
+      // Preserve existing node metadata (owner, subprocesses) by merging with fresh parsed data
+      if (doc.parsedData?.nodes && freshParsedData.nodes) {
+        // Create a map of existing nodes by ID for quick lookup
+        const existingNodesMap = new Map();
+        doc.parsedData.nodes.forEach(node => {
+          existingNodesMap.set(node.id, node);
+        });
+        
+        // Merge fresh parsed nodes with existing metadata
+        freshParsedData.nodes = freshParsedData.nodes.map(freshNode => {
+          const existingNode = existingNodesMap.get(freshNode.id);
+          if (existingNode) {
+            // Preserve owner and subprocesses from existing node
+            return {
+              ...freshNode, // Fresh data from XML (label, shape, position, etc.)
+              owner: existingNode.owner || freshNode.owner || '', // Preserve owner
+              subprocesses: existingNode.subprocesses || freshNode.subprocesses || [], // Preserve subprocesses
+            };
+          }
+          return freshNode;
+        });
+        
+        // Also preserve any nodes that exist in old data but not in fresh (shouldn't happen, but safe)
+        const freshNodeIds = new Set(freshParsedData.nodes.map(n => n.id));
+        doc.parsedData.nodes.forEach(existingNode => {
+          if (!freshNodeIds.has(existingNode.id)) {
+            // Node was removed from XML, but we keep it with its metadata
+            // Actually, if it's not in XML, it shouldn't be in parsedData either
+            // So we skip this case
+          }
+        });
+      }
+      
+      // Update parsedData with merged data
+      doc.parsedData = {
+        ...freshParsedData,
+        diagramId: freshParsedData.diagramId || doc.parsedData?.diagramId || diagramId,
+      };
+      
+      console.log(`✅ Re-parsed diagram XML: ${freshParsedData.nodes.length} nodes, ${freshParsedData.connections.length} connections`);
+      console.log(`   - Preserved metadata (owners, subprocesses) from existing parsedData`);
+    } catch (parseError) {
+      console.error('⚠️  Failed to re-parse XML:', parseError.message);
+      // Continue without failing - XML is still updated, but parsedData might be stale
+    }
+
+    await doc.save();
+
+    return res.json({
+      id: doc._id,
+      name: doc.name,
+      sourceFileName: doc.sourceFileName,
+      processOwner: doc.processOwner,
+      parsedData: doc.parsedData,
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt,
+    });
+  } catch (err) {
+    console.error('Error updating diagram XML:', err);
+    return res.status(500).json({ error: 'Failed to update diagram.' });
+  }
+});
 
 /**
  * POST /api/diagrams

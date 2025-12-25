@@ -203,6 +203,9 @@ function updateDiagramXml(xml, updatedNodes) {
       const spacing = Math.max(30, minSpacing); // Spacing between parent and subprocesses (minimum 100px for visibility)
       const subprocessSpacing = 80; // Vertical spacing between multiple subprocesses
       
+      // Track subprocess IDs as we create them for parent lookup
+      const subprocessIdMap = new Map(); // Maps subprocess index to its node ID
+      
       node.subprocesses.forEach((subprocess, index) => {
         const subprocessObj = typeof subprocess === 'string' 
           ? { name: subprocess, shape: 'rectangle' }
@@ -258,10 +261,61 @@ function updateDiagramXml(xml, updatedNodes) {
         
         // CRITICAL: Add subprocess ID to cellIdMap so edges can reference it
         cellIdMap.set(String(subprocessId), true);
+        // Also track in subprocessIdMap for parent lookup
+        subprocessIdMap.set(index, subprocessId);
         
-        // Position subprocesses to the right of parent, vertically aligned
-        const subprocessX = parentPos.x + parentWidth + spacing;
-        const subprocessY = parentPos.y + (index * subprocessSpacing);
+        // Calculate initial position for subprocess
+        let subprocessX = parentPos.x + parentWidth + spacing;
+        let subprocessY = parentPos.y + (index * subprocessSpacing);
+        const subprocessWidth = 120;
+        const subprocessHeight = 60;
+        
+        // Check for overlaps with existing nodes and adjust position
+        let overlapFound = true;
+        let attempts = 0;
+        const maxAttempts = 50;
+        const stepSize = 20;
+        
+        while (overlapFound && attempts < maxAttempts) {
+          overlapFound = false;
+          
+          // Check against all existing node positions
+          for (const [existingId, existingPos] of nodePositionMap.entries()) {
+            // Skip if it's the parent node or a subprocess from the same parent
+            if (existingId === String(node.id)) continue;
+            
+            const existingX = existingPos.x;
+            const existingY = existingPos.y;
+            const existingWidth = 120; // Standard node width
+            const existingHeight = 60; // Standard node height
+            
+            // Check for overlap (with some padding)
+            const padding = 10;
+            if (
+              subprocessX < existingX + existingWidth + padding &&
+              subprocessX + subprocessWidth + padding > existingX &&
+              subprocessY < existingY + existingHeight + padding &&
+              subprocessY + subprocessHeight + padding > existingY
+            ) {
+              overlapFound = true;
+              // Try moving down first
+              subprocessY += subprocessHeight + padding;
+              attempts++;
+              break;
+            }
+          }
+          
+          // If still overlapping, try moving further right
+          if (overlapFound && attempts % 5 === 0) {
+            subprocessX += spacing;
+          }
+        }
+        
+        if (attempts >= maxAttempts) {
+          console.warn(`   ⚠️  Could not find non-overlapping position for subprocess "${subprocessObj.name}", using calculated position`);
+        } else if (attempts > 0) {
+          console.log(`   📍 Adjusted subprocess "${subprocessObj.name}" position to avoid overlap (${attempts} adjustments)`);
+        }
         
         // Get shape style
         const getShapeStyle = (shape) => {
@@ -338,32 +392,138 @@ function updateDiagramXml(xml, updatedNodes) {
           console.warn(`   ⚠️  Source ID ${sourceId} not found as mxCell ID, but will try anyway`);
         }
         
-        // ALWAYS create a NEW connector for subprocesses - never modify existing connectors
-        // Each subprocess should have its own dedicated connector arrow from the parent node
-        // We don't check for existing edges - we always create a fresh one
-        console.log(`   🔗 Creating NEW connector from parent node ${actualSourceId} to subprocess ${subprocessObj.name} (${subprocessId})`);
+        // Determine parent node ID based on subprocess parent selection
+        let parentNodeId;
+        let parentNodePos;
+        let parentNodeWidth;
+        let parentNodeHeight;
         
-        // Create edge/connection from parent node to subprocess
+        if (subprocessObj.parent === 'main' || !subprocessObj.parent) {
+          // Connect to main step
+          parentNodeId = actualSourceId;
+          parentNodePos = parentPos;
+          parentNodeWidth = parentWidth;
+          parentNodeHeight = parentHeight;
+          console.log(`   🔗 Subprocess "${subprocessObj.name}" will connect to main step (${parentNodeId})`);
+        } else if (subprocessObj.parent.startsWith('subprocess-')) {
+          // Connect to previous subprocess
+          const parentSubprocessIndex = parseInt(subprocessObj.parent.replace('subprocess-', ''));
+          if (parentSubprocessIndex >= 0 && parentSubprocessIndex < index) {
+            // First try to find parent subprocess ID from subprocessIdMap (if we've already created it)
+            if (subprocessIdMap.has(parentSubprocessIndex)) {
+              parentNodeId = subprocessIdMap.get(parentSubprocessIndex);
+              // Calculate parent subprocess position
+              const parentSubprocessX = parentPos.x + parentWidth + spacing;
+              const parentSubprocessY = parentPos.y + (parentSubprocessIndex * subprocessSpacing);
+              parentNodePos = { x: parentSubprocessX, y: parentSubprocessY };
+              parentNodeWidth = 120;
+              parentNodeHeight = 60;
+              
+              const parentSubprocess = node.subprocesses[parentSubprocessIndex];
+              const parentSubprocessName = typeof parentSubprocess === 'string' 
+                ? parentSubprocess 
+                : (parentSubprocess.name || `S${parentSubprocessIndex + 1}`);
+              console.log(`   🔗 Subprocess "${subprocessObj.name}" will connect to subprocess "${parentSubprocessName}" (${parentNodeId}) [from map]`);
+            } else {
+              // Parent subprocess not created yet, search in XML for existing one
+              const parentSubprocess = node.subprocesses[parentSubprocessIndex];
+              const parentSubprocessObj = typeof parentSubprocess === 'string' 
+                ? { name: parentSubprocess, shape: 'rectangle' }
+                : parentSubprocess;
+              
+              const parentSubprocessName = parentSubprocessObj.name;
+              if (parentSubprocessName) {
+                const escapedParentName = parentSubprocessName
+                  .replace(/&/g, '&amp;')
+                  .replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;')
+                  .replace(/"/g, '&quot;');
+                const parentNameInValue = `&lt;div&gt;&lt;p&gt;${escapedParentName}&lt;/p&gt;&lt;/div&gt;`;
+                const escapedParentValue = parentNameInValue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                
+                const parentSubprocessPattern = new RegExp(`<mxCell[^>]*id="([^"]+)"[^>]*value="${escapedParentValue}"[^>]*vertex="1"`, 'i');
+                const parentSubprocessMatch = decodedXml.match(parentSubprocessPattern);
+                
+                if (parentSubprocessMatch && parentSubprocessMatch[1]) {
+                  parentNodeId = parentSubprocessMatch[1];
+                  // Calculate parent subprocess position
+                  const parentSubprocessX = parentPos.x + parentWidth + spacing;
+                  const parentSubprocessY = parentPos.y + (parentSubprocessIndex * subprocessSpacing);
+                  parentNodePos = { x: parentSubprocessX, y: parentSubprocessY };
+                  parentNodeWidth = 120;
+                  parentNodeHeight = 60;
+                  console.log(`   🔗 Subprocess "${subprocessObj.name}" will connect to subprocess "${parentSubprocessName}" (${parentNodeId}) [from XML]`);
+                } else {
+                  // Fallback to main step if parent subprocess not found
+                  parentNodeId = actualSourceId;
+                  parentNodePos = parentPos;
+                  parentNodeWidth = parentWidth;
+                  parentNodeHeight = parentHeight;
+                  console.warn(`   ⚠️  Parent subprocess "${parentSubprocessName}" not found, connecting to main step instead`);
+                }
+              } else {
+                // No name for parent subprocess, fallback to main step
+                parentNodeId = actualSourceId;
+                parentNodePos = parentPos;
+                parentNodeWidth = parentWidth;
+                parentNodeHeight = parentHeight;
+                console.warn(`   ⚠️  Parent subprocess has no name, connecting to main step instead`);
+              }
+            }
+          } else {
+            // Invalid parent index, fallback to main step
+            parentNodeId = actualSourceId;
+            parentNodePos = parentPos;
+            parentNodeWidth = parentWidth;
+            parentNodeHeight = parentHeight;
+            console.warn(`   ⚠️  Invalid parent subprocess index ${parentSubprocessIndex}, connecting to main step instead`);
+          }
+        } else {
+          // Unknown parent format, fallback to main step
+          parentNodeId = actualSourceId;
+          parentNodePos = parentPos;
+          parentNodeWidth = parentWidth;
+          parentNodeHeight = parentHeight;
+          console.warn(`   ⚠️  Unknown parent format "${subprocessObj.parent}", connecting to main step instead`);
+        }
+        
+        // ALWAYS create a NEW connector for subprocesses - never modify existing connectors
+        // Each subprocess should have its own dedicated connector arrow from the selected parent
+        console.log(`   🔗 Creating NEW connector from ${parentNodeId === actualSourceId ? 'main step' : 'parent subprocess'} to subprocess ${subprocessObj.name} (${subprocessId})`);
+        
+        // Create edge/connection from selected parent node to subprocess
         {
-          // Create edge/connection from parent node to subprocess
           // Edge style: solid black line with arrow (same as regular connectors)
           const edgeId = nextEdgeId++;
           // Use standard black connector style matching regular diagram connectors
-          // exitX=1 (right), exitY=0.5 (middle), entryX=0 (left), entryY=0.5 (middle)
-          const edgeStyle = 'edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;';
+          // Adjust exit/entry points based on parent type
+          let exitX, exitY, entryX, entryY;
           
-          // Create edge - match the format of existing edges exactly
-          // CRITICAL: Ensure target ID matches the subprocess node ID exactly (could be existing ID like "13" or new ID)
+          if (parentNodeId === actualSourceId) {
+            // Connecting from main step: exit from right side
+            exitX = 1;
+            exitY = 0.5;
+            entryX = 0;
+            entryY = 0.5;
+          } else {
+            // Connecting from another subprocess: exit from bottom
+            exitX = 0.5;
+            exitY = 1;
+            entryX = 0.5;
+            entryY = 0;
+          }
+          
+          const edgeStyle = `edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;html=1;exitX=${exitX};exitY=${exitY};exitDx=0;exitDy=0;entryX=${entryX};entryY=${entryY};entryDx=0;entryDy=0;`;
           
           // Verify both source and target IDs exist
-          const sourceExists = cellIdMap.has(actualSourceId);
+          const sourceExists = cellIdMap.has(parentNodeId);
           const targetExists = cellIdMap.has(String(subprocessId));
           
           if (!sourceExists) {
-            console.warn(`   ⚠️  WARNING: Source ID "${actualSourceId}" not found in cellIdMap!`);
+            console.warn(`   ⚠️  WARNING: Source ID "${parentNodeId}" not found in cellIdMap!`);
             console.warn(`   ⚠️  Available IDs: ${Array.from(cellIdMap.keys()).slice(0, 15).join(', ')}`);
           } else {
-            console.log(`   ✅ Source ID "${actualSourceId}" verified in cellIdMap`);
+            console.log(`   ✅ Source ID "${parentNodeId}" verified in cellIdMap`);
           }
           
           if (!targetExists) {
@@ -373,18 +533,27 @@ function updateDiagramXml(xml, updatedNodes) {
           }
           
           // Create edge XML with explicit geometry points to ensure visible length
-          // Calculate waypoints to make the connector visible and properly routed
-          // The connector should go from parent node (right side) to subprocess node (left side)
-          // Add intermediate waypoints to ensure the connector is visible
+          // Calculate waypoints based on parent type
           const subprocessHeight = 60; // Standard subprocess node height
-          const waypointX1 = parentPos.x + parentWidth + 20; // 20px to the right of parent
-          const waypointY1 = parentPos.y + (parentHeight / 2); // Middle of parent
-          const waypointX2 = subprocessX - 20; // 20px to the left of subprocess
-          const waypointY2 = subprocessY + (subprocessHeight / 2); // Middle of subprocess
+          let waypointX1, waypointY1, waypointX2, waypointY2;
+          
+          if (parentNodeId === actualSourceId) {
+            // Horizontal connection from main step to subprocess
+            waypointX1 = parentNodePos.x + parentNodeWidth + 20; // 20px to the right of parent
+            waypointY1 = parentNodePos.y + (parentNodeHeight / 2); // Middle of parent
+            waypointX2 = subprocessX - 20; // 20px to the left of subprocess
+            waypointY2 = subprocessY + (subprocessHeight / 2); // Middle of subprocess
+          } else {
+            // Vertical connection from parent subprocess to this subprocess
+            waypointX1 = parentNodePos.x + (parentNodeWidth / 2); // Middle of parent subprocess
+            waypointY1 = parentNodePos.y + parentNodeHeight + 20; // 20px below parent subprocess
+            waypointX2 = subprocessX + (120 / 2); // Middle of this subprocess
+            waypointY2 = subprocessY - 20; // 20px above this subprocess
+          }
           
           // Create edge XML with waypoints to ensure visible connector
           // Format: id, value, style, edge, parent, source, target, then geometry with waypoints
-          const edgeXml = `<mxCell id="${edgeId}" value="" style="${edgeStyle}" edge="1" parent="1" source="${actualSourceId}" target="${subprocessId}">
+          const edgeXml = `<mxCell id="${edgeId}" value="" style="${edgeStyle}" edge="1" parent="1" source="${parentNodeId}" target="${subprocessId}">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="${waypointX1}" y="${waypointY1}" />
@@ -397,25 +566,8 @@ function updateDiagramXml(xml, updatedNodes) {
           
           // Log the full edge XML for debugging
           console.log(`   🔗 Edge XML (full): ${edgeXml}`);
-          console.log(`   🔗 Source ID: "${actualSourceId}", Target ID: "${subprocessId}", Edge ID: "${edgeId}"`);
-          console.log(`   ✅ Created NEW edge connecting node ${sourceId} -> subprocess ${subprocessObj.name} (${subprocessId}) via edge ${edgeId}`);
-          
-          // If there are multiple subprocesses, connect them with arrows too
-          if (index > 0) {
-            // Calculate previous subprocess ID (the one created before this one)
-            const prevSubprocessId = nextSubprocessId - (node.subprocesses.length - index + 1);
-            
-            // Verify previous subprocess ID exists
-            if (cellIdMap.has(String(prevSubprocessId))) {
-              const connectorEdgeId = nextEdgeId++;
-              const connectorStyle = 'edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;';
-              const connectorXml = `<mxCell id="${connectorEdgeId}" value="" style="${connectorStyle}" edge="1" parent="1" source="${prevSubprocessId}" target="${subprocessId}"><mxGeometry relative="1" as="geometry"/></mxCell>`;
-              subprocessEdgesXml.push(connectorXml);
-              console.log(`   ✅ Created connector between subprocesses: ${prevSubprocessId} -> ${subprocessId} via edge ${connectorEdgeId}`);
-            } else {
-              console.warn(`   ⚠️  Previous subprocess ID ${prevSubprocessId} not found, skipping connector`);
-            }
-          }
+          console.log(`   🔗 Source ID: "${parentNodeId}", Target ID: "${subprocessId}", Edge ID: "${edgeId}"`);
+          console.log(`   ✅ Created NEW edge connecting ${parentNodeId === actualSourceId ? 'main step' : 'parent subprocess'} -> subprocess ${subprocessObj.name} (${subprocessId}) via edge ${edgeId}`);
         }
       });
     });

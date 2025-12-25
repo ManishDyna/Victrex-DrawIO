@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './FormView.css';
 
@@ -22,6 +22,8 @@ function FormView() {
   const [nodes, setNodes] = useState([]);
   const [connections, setConnections] = useState([]);
   const [expandedNodes, setExpandedNodes] = useState(new Set());
+  const [deletedSubprocessNames, setDeletedSubprocessNames] = useState(new Set()); // Track deleted subprocesses by name
+  const lastReloadTimeRef = useRef(0); // Track last reload time to avoid excessive reloads
 
   // Load diagram data
   useEffect(() => {
@@ -31,51 +33,130 @@ function FormView() {
       return;
     }
 
-    fetch(`http://localhost:3001/api/diagrams/${id}`)
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error('Failed to fetch diagram');
-        }
-        return res.json();
-      })
-      .then((data) => {
-        setDiagram(data);
-        setProcessOwner(data.processOwner || '');
-        
-        // Initialize nodes with editable content
-        if (data.parsedData?.nodes) {
-          const editableNodes = data.parsedData.nodes.map(node => {
-            // Convert subprocesses to objects if they're strings
-            const processedSubprocesses = (node.subprocesses || []).map(sub => 
-              typeof sub === 'string' ? { name: sub, shape: 'rectangle' } : sub
-            );
-            return {
-              ...node,
-              editedLabel: extractTextFromHtml(node.label || ''),
-              owner: node.owner || '',
-              subprocesses: processedSubprocesses,
-            };
+    const loadData = () => {
+      setLoading(true);
+      fetch(`http://localhost:3001/api/diagrams/${id}`)
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error('Failed to fetch diagram');
+          }
+          return res.json();
+        })
+        .then((data) => {
+          console.log('📥 FormView: Loaded diagram data:', {
+            nodeCount: data.parsedData?.nodes?.length || 0,
+            connectionCount: data.parsedData?.connections?.length || 0,
+            nodeIds: data.parsedData?.nodes?.map(n => ({ id: n.id, label: extractTextFromHtml(n.label || '') })) || []
           });
-          setNodes(editableNodes);
-          // Expand all nodes by default
-          setExpandedNodes(new Set(editableNodes.map(n => n.id)));
-        } else {
-          setNodes([]);
+          
+          setDiagram(data);
+          setProcessOwner(data.processOwner || '');
+          
+          // Initialize nodes with editable content
+          if (data.parsedData?.nodes) {
+            const editableNodes = data.parsedData.nodes.map((node, nodeIndex) => {
+              // Convert subprocesses to objects if they're strings
+              // IMPORTANT: Only include user-added subprocesses here (not detected ones)
+              // Detected subprocesses will be added dynamically from branch nodes
+              const processedSubprocesses = (node.subprocesses || [])
+                .map(sub => typeof sub === 'string' ? { name: sub, shape: 'rectangle' } : sub)
+                .map((sub, subIndex) => {
+                  // Set default parent if not present
+                  if (!sub.parent) {
+                    sub.parent = subIndex === 0 ? 'main' : `subprocess-${subIndex - 1}`;
+                  }
+                  return sub;
+                });
+              
+              return {
+                ...node,
+                editedLabel: extractTextFromHtml(node.label || ''),
+                owner: node.owner || '',
+                subprocesses: processedSubprocesses, // Only user-added subprocesses
+              };
+            });
+            setNodes(editableNodes);
+            // Expand all nodes by default
+            setExpandedNodes(new Set(editableNodes.map(n => n.id)));
+            
+            console.log('📋 FormView: Initialized nodes:', editableNodes.map(n => ({
+              id: n.id,
+              label: n.editedLabel,
+              userAddedSubprocessCount: n.subprocesses?.length || 0
+            })));
+          } else {
+            setNodes([]);
+          }
+          
+          if (data.parsedData?.connections) {
+            setConnections(data.parsedData.connections);
+            console.log('🔗 FormView: Loaded connections:', data.parsedData.connections.map(c => ({
+              from: c.from,
+              to: c.to
+            })));
+          } else {
+            setConnections([]);
+          }
+          
+          // Clear deleted subprocess names when reloading to allow newly detected ones to appear
+          setDeletedSubprocessNames(new Set());
+          
+          setLoading(false);
+        })
+        .catch((err) => {
+          console.error(err);
+          setError('Failed to load diagram');
+          setLoading(false);
+        });
+    };
+
+    loadData();
+
+    // Reload data when component becomes visible (user navigates back from Editor)
+    // Use a debounce mechanism to avoid excessive reloads
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && id) {
+        const now = Date.now();
+        // Only reload if at least 2 seconds have passed since last reload
+        if (now - lastReloadTimeRef.current > 2000) {
+          console.log('FormView: Page became visible, reloading diagram data...');
+          lastReloadTimeRef.current = now;
+          loadData();
         }
-        
-        if (data.parsedData?.connections) {
-          setConnections(data.parsedData.connections);
-        } else {
-          setConnections([]);
+      }
+    };
+
+    let focusTimeoutId = null;
+    const handleFocus = () => {
+      if (id) {
+        // Clear any pending focus reload
+        if (focusTimeoutId) {
+          clearTimeout(focusTimeoutId);
         }
-        
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error(err);
-        setError('Failed to load diagram');
-        setLoading(false);
-      });
+        // Debounce focus events - only reload if window was unfocused for a while
+        focusTimeoutId = setTimeout(() => {
+          const now = Date.now();
+          // Only reload if at least 2 seconds have passed since last reload
+          if (now - lastReloadTimeRef.current > 2000) {
+            console.log('FormView: Window focused after being away, reloading diagram data...');
+            lastReloadTimeRef.current = now;
+            loadData();
+          }
+          focusTimeoutId = null;
+        }, 1000);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      if (focusTimeoutId) {
+        clearTimeout(focusTimeoutId);
+      }
+    };
   }, [id]);
 
   // Extract plain text from HTML label
@@ -112,51 +193,303 @@ function FormView() {
   };
 
   // Handle subprocess change
+  // IMPORTANT: subprocessIndex is the index in the DISPLAYED list (nodesWithBranches)
+  // We need to find the corresponding subprocess in node.subprocesses or handle detected ones
   const handleSubprocessChange = (nodeId, subprocessIndex, field, value) => {
-    setNodes(prevNodes =>
-      prevNodes.map(node => {
-        if (node.id === nodeId) {
-          const newSubprocesses = [...(node.subprocesses || [])];
-          // Subprocesses are now objects with name and shape
-          if (subprocessIndex >= 0 && subprocessIndex < newSubprocesses.length) {
-            const subprocess = typeof newSubprocesses[subprocessIndex] === 'string' 
-              ? { name: newSubprocesses[subprocessIndex], shape: 'rectangle' }
-              : newSubprocesses[subprocessIndex];
-            subprocess[field] = value;
-            newSubprocesses[subprocessIndex] = subprocess;
-          } else {
-            newSubprocesses.push({ name: '', shape: 'rectangle' });
+    console.log(`🔄 handleSubprocessChange: nodeId=${nodeId}, subprocessIndex=${subprocessIndex}, field=${field}, value="${value}"`);
+    
+    setNodes(prevNodes => {
+      // Get the current displayed subprocesses to find what we're updating
+      const { mainFlowNodes, branchNodes } = findMainFlow(prevNodes, connections);
+      const currentNode = mainFlowNodes.find(n => n.id === nodeId);
+      if (!currentNode) {
+        console.warn(`⚠️  Node ${nodeId} not found in main flow`);
+        return prevNodes;
+      }
+      
+      const branchNodesForThis = branchNodes.get(nodeId) || [];
+      const userAddedSubprocesses = (currentNode.subprocesses || []).map(sub => 
+        typeof sub === 'string' ? { name: sub, shape: 'rectangle' } : sub
+      );
+      
+      const userAddedSubprocessNames = new Set(
+        userAddedSubprocesses
+          .map(sub => (sub.name || '').trim().toLowerCase())
+          .filter(name => name.length > 0)
+      );
+      
+      const detectedSubprocesses = branchNodesForThis
+        .map(branch => {
+          const label = extractTextFromHtml(branch.label || '');
+          return {
+            name: label || branch.id,
+            shape: branch.shape || 'rectangle',
+            parent: 'main',
+            isDetected: true,
+            branchId: branch.id
+          };
+        })
+        .filter(branchSub => {
+          const branchName = (branchSub.name || '').trim().toLowerCase();
+          return branchName.length > 0 && 
+                 !userAddedSubprocessNames.has(branchName) &&
+                 !deletedSubprocessNames.has(branchName);
+        });
+      
+      // Display order: detected first, then user-added
+      const displayedSubprocesses = [...detectedSubprocesses, ...userAddedSubprocesses];
+      
+      if (subprocessIndex >= 0 && subprocessIndex < displayedSubprocesses.length) {
+        const subprocessToUpdate = displayedSubprocesses[subprocessIndex];
+        const isDetected = subprocessToUpdate.isDetected || subprocessIndex < detectedSubprocesses.length;
+        
+        console.log(`   Subprocess to update:`, {
+          isDetected,
+          subprocessIndex,
+          detectedCount: detectedSubprocesses.length,
+          userAddedCount: userAddedSubprocesses.length,
+          subprocessToUpdate
+        });
+        
+        return prevNodes.map(node => {
+          if (node.id === nodeId) {
+            if (isDetected) {
+              // For detected subprocesses, we need to add them to node.subprocesses first
+              // Then update them
+              const subprocessName = (subprocessToUpdate.name || '').trim().toLowerCase();
+              const existingIndex = userAddedSubprocesses.findIndex(sub => {
+                const subName = (sub.name || '').trim().toLowerCase();
+                return subName === subprocessName || (sub.branchId === subprocessToUpdate.branchId && subprocessToUpdate.branchId);
+              });
+              
+              let updatedSubprocesses = [...userAddedSubprocesses];
+              
+              if (existingIndex >= 0) {
+                // Already exists in user-added, update it
+                const subprocess = { ...updatedSubprocesses[existingIndex] };
+                subprocess[field] = value;
+                updatedSubprocesses[existingIndex] = subprocess;
+                console.log(`   ✅ Updated existing user-added subprocess at index ${existingIndex}`);
+              } else {
+                // Check if we're updating an empty subprocess that matches this detected one
+                // (This can happen when user starts typing in an empty subprocess that happens to match a detected name)
+                const emptySubprocessIndex = userAddedSubprocesses.findIndex(sub => 
+                  (!sub.name || sub.name.trim() === '') && field === 'name'
+                );
+                
+                if (emptySubprocessIndex >= 0 && field === 'name') {
+                  // Update the empty subprocess instead of creating a new one
+                  const subprocess = { ...userAddedSubprocesses[emptySubprocessIndex] };
+                  subprocess[field] = value;
+                  subprocess.branchId = subprocessToUpdate.branchId; // Link to detected branch
+                  updatedSubprocesses[emptySubprocessIndex] = subprocess;
+                  console.log(`   ✅ Updated empty subprocess at index ${emptySubprocessIndex} with detected branch info`);
+                } else {
+                  // Doesn't exist yet, add it as a new user-added subprocess
+                  const newSubprocess = {
+                    name: subprocessToUpdate.name,
+                    shape: subprocessToUpdate.shape || 'rectangle',
+                    parent: subprocessToUpdate.parent || 'main',
+                    branchId: subprocessToUpdate.branchId,
+                    [field]: value
+                  };
+                  updatedSubprocesses.push(newSubprocess);
+                  console.log(`   ➕ Added new user-added subprocess from detected`);
+                }
+              }
+              
+              return { ...node, subprocesses: updatedSubprocesses };
+            } else {
+              // It's a user-added subprocess - update directly by index in userAddedSubprocesses
+              const userAddedIndex = subprocessIndex - detectedSubprocesses.length;
+              const updatedSubprocesses = [...userAddedSubprocesses];
+              
+              if (userAddedIndex >= 0 && userAddedIndex < updatedSubprocesses.length) {
+                // Get the existing subprocess
+                const existingSubprocess = updatedSubprocesses[userAddedIndex];
+                const subprocess = typeof existingSubprocess === 'string'
+                  ? { name: existingSubprocess, shape: 'rectangle' }
+                  : { ...existingSubprocess };
+                
+                // Update the field
+                subprocess[field] = value;
+                
+                // IMPORTANT: Preserve all existing properties to avoid creating a new object
+                updatedSubprocesses[userAddedIndex] = subprocess;
+                
+                console.log(`   ✅ Updated user-added subprocess at index ${userAddedIndex} (display index ${subprocessIndex}):`, {
+                  before: existingSubprocess,
+                  after: subprocess
+                });
+              } else {
+                console.warn(`⚠️  Invalid userAddedIndex: ${userAddedIndex} (subprocessIndex: ${subprocessIndex}, detectedCount: ${detectedSubprocesses.length}, userAddedCount: ${userAddedSubprocesses.length})`);
+                // Don't modify if index is invalid
+                return prevNodes;
+              }
+              
+              return { ...node, subprocesses: updatedSubprocesses };
+            }
           }
-          return { ...node, subprocesses: newSubprocesses };
-        }
-        return node;
-      })
-    );
+          return node;
+        });
+      }
+      
+      console.warn(`⚠️  Invalid subprocessIndex: ${subprocessIndex} (total displayed: ${displayedSubprocesses.length})`);
+      return prevNodes;
+    });
   };
 
   // Add new subprocess
   const handleAddSubprocess = (nodeId) => {
-    setNodes(prevNodes =>
-      prevNodes.map(node =>
-        node.id === nodeId
-          ? { ...node, subprocesses: [...(node.subprocesses || []), { name: '', shape: 'rectangle' }] }
-          : node
-      )
-    );
-  };
+    console.log(`➕ handleAddSubprocess called for node: ${nodeId}`);
+    
+    setNodes(prevNodes => {
+      // Find the node in the current state
+      const currentNode = prevNodes.find(n => n.id === nodeId);
+      if (!currentNode) {
+        console.warn(`⚠️  Cannot add subprocess: Node ${nodeId} not found in nodes state`);
+        console.warn(`   Available node IDs:`, prevNodes.map(n => n.id));
+        return prevNodes;
+      }
 
-  // Remove subprocess
-  const handleRemoveSubprocess = (nodeId, subprocessIndex) => {
-    setNodes(prevNodes =>
-      prevNodes.map(node => {
+      // Get existing user-added subprocesses (not detected ones)
+      const existingSubprocesses = (currentNode.subprocesses || []).map(sub => 
+        typeof sub === 'string' ? { name: sub, shape: 'rectangle' } : sub
+      );
+
+      // Calculate default parent based on the DISPLAYED subprocesses (detected + user-added)
+      // We need to check what's actually displayed to determine the correct parent index
+      let detectedCount = 0;
+      try {
+        const { mainFlowNodes, branchNodes } = findMainFlow(prevNodes, connections);
+        const branchNodesForThis = branchNodes.get(nodeId) || [];
+        detectedCount = branchNodesForThis.length;
+      } catch (error) {
+        console.warn('⚠️  Error calculating detected subprocesses:', error);
+        detectedCount = 0;
+      }
+      
+      // Default parent: 'main' for first subprocess, last existing subprocess for others
+      let defaultParent = 'main';
+      if (existingSubprocesses.length > 0) {
+        // Find the last subprocess with a name (skip empty ones)
+        for (let i = existingSubprocesses.length - 1; i >= 0; i--) {
+          const lastSub = existingSubprocesses[i];
+          if (lastSub.name && lastSub.name.trim()) {
+            // Parent index needs to account for detected subprocesses that appear first
+            // In display: detected subprocesses are at indices 0 to detectedCount-1
+            // User-added subprocesses start at index detectedCount
+            // So the parent index for user-added is: detectedCount + i
+            defaultParent = `subprocess-${detectedCount + i}`;
+            break;
+          }
+        }
+      } else if (detectedCount > 0) {
+        // If no user-added subprocesses yet, but there are detected ones,
+        // default to connecting to the last detected subprocess
+        defaultParent = `subprocess-${detectedCount - 1}`;
+      }
+      
+      console.log(`➕ Adding new subprocess to node "${nodeId}":`, {
+        existingUserAddedCount: existingSubprocesses.length,
+        detectedCount,
+        defaultParent,
+        currentNodeLabel: extractTextFromHtml(currentNode.label || currentNode.id)
+      });
+      
+      // Always add new subprocess at the END of the user-added array
+      // (It will appear after detected subprocesses in the display)
+      const updatedNodes = prevNodes.map(node => {
         if (node.id === nodeId) {
-          const newSubprocesses = [...(node.subprocesses || [])];
-          newSubprocesses.splice(subprocessIndex, 1);
-          return { ...node, subprocesses: newSubprocesses };
+          const newSubprocess = { 
+            name: '', 
+            shape: 'rectangle',
+            parent: defaultParent
+          };
+          const updatedSubprocesses = [...existingSubprocesses, newSubprocess];
+          
+          console.log(`✅ Updated node ${nodeId} subprocesses:`, {
+            before: existingSubprocesses.length,
+            after: updatedSubprocesses.length,
+            newSubprocess
+          });
+          
+          return { 
+            ...node, 
+            subprocesses: updatedSubprocesses
+          };
         }
         return node;
-      })
+      });
+      
+      return updatedNodes;
+    });
+  };
+
+  // Remove subprocess - works for both detected and user-added subprocesses
+  const handleRemoveSubprocess = (nodeId, subprocessIndex) => {
+    // Get the current displayed subprocesses (detected first, then user-added)
+    const { mainFlowNodes, branchNodes } = findMainFlow(nodes, connections);
+    const currentNode = mainFlowNodes.find(n => n.id === nodeId);
+    if (!currentNode) return;
+    
+    const branchNodesForThis = branchNodes.get(nodeId) || [];
+    const userAddedSubprocesses = (currentNode.subprocesses || []).map(sub => 
+      typeof sub === 'string' ? { name: sub, shape: 'rectangle' } : sub
     );
+    
+    const userAddedSubprocessNames = new Set(
+      userAddedSubprocesses
+        .map(sub => (sub.name || '').trim().toLowerCase())
+        .filter(name => name.length > 0)
+    );
+    
+    const detectedSubprocesses = branchNodesForThis
+      .map(branch => {
+        const label = extractTextFromHtml(branch.label || '');
+        return {
+          name: label || branch.id,
+          shape: branch.shape || 'rectangle',
+          parent: 'main',
+          isDetected: true
+        };
+      })
+      .filter(branchSub => {
+        const branchName = (branchSub.name || '').trim().toLowerCase();
+        return branchName.length > 0 && 
+               !userAddedSubprocessNames.has(branchName) &&
+               !deletedSubprocessNames.has(branchName);
+      });
+    
+    // Display order: detected first, then user-added
+    const displayedSubprocesses = [...detectedSubprocesses, ...userAddedSubprocesses];
+    
+    if (subprocessIndex >= 0 && subprocessIndex < displayedSubprocesses.length) {
+      const subprocessToDelete = displayedSubprocesses[subprocessIndex];
+      const subprocessName = (subprocessToDelete.name || '').trim().toLowerCase();
+      const isDetected = subprocessToDelete.isDetected || subprocessIndex < detectedSubprocesses.length;
+      
+      if (isDetected) {
+        // It's a detected subprocess (branch node) - mark as deleted
+        setDeletedSubprocessNames(prev => new Set([...prev, subprocessName]));
+      } else {
+        // It's a user-added subprocess - remove from node.subprocesses
+        setNodes(prevNodes =>
+          prevNodes.map(node => {
+            if (node.id === nodeId) {
+              const updatedSubprocesses = (node.subprocesses || [])
+                .map(sub => typeof sub === 'string' ? { name: sub, shape: 'rectangle' } : sub)
+                .filter(sub => {
+                  const subName = (sub.name || '').trim().toLowerCase();
+                  return subName !== subprocessName;
+                });
+              return { ...node, subprocesses: updatedSubprocesses };
+            }
+            return node;
+          })
+        );
+      }
+    }
   };
 
   // Save changes
@@ -165,15 +498,33 @@ function FormView() {
 
     setSaving(true);
     try {
+      // First, fetch the latest diagram data to ensure we have the most recent connections
+      // This prevents overwriting Editor changes that happened after FormView loaded
+      const latestResponse = await fetch(`http://localhost:3001/api/diagrams/${id}`);
+      if (!latestResponse.ok) {
+        throw new Error('Failed to fetch latest diagram data');
+      }
+      const latestDiagram = await latestResponse.json();
+      
       // Update parsedData with edited nodes
-      const updatedNodes = nodes.map(node => ({
+      const updatedNodes = nodes.map((node, nodeIndex) => ({
         ...node,
         label: textToHtml(node.editedLabel), // Convert back to HTML format
         editedLabel: node.editedLabel, // Keep editedLabel for XML update
-        subprocesses: (node.subprocesses || []).map(sub => 
-          typeof sub === 'string' ? { name: sub, shape: 'rectangle' } : sub
-        ),
+        subprocesses: (node.subprocesses || []).map((sub, subIndex) => {
+          const subObj = typeof sub === 'string' 
+            ? { name: sub, shape: 'rectangle' } 
+            : sub;
+          // Ensure parent is set (default if missing)
+          if (!subObj.parent) {
+            subObj.parent = subIndex === 0 ? 'main' : `subprocess-${subIndex - 1}`;
+          }
+          return subObj;
+        }),
       }));
+
+      // Use latest connections from database to preserve Editor changes
+      const latestConnections = latestDiagram.parsedData?.connections || connections;
 
       const response = await fetch(`http://localhost:3001/api/diagrams/${id}`, {
         method: 'PATCH',
@@ -183,9 +534,9 @@ function FormView() {
         body: JSON.stringify({
           processOwner,
           parsedData: {
-            ...diagram.parsedData,
-            nodes: updatedNodes,
-            connections,
+            ...latestDiagram.parsedData, // Use latest parsedData as base
+            nodes: updatedNodes, // Override with FormView edits
+            connections: latestConnections, // Use latest connections
           },
         }),
       });
@@ -324,20 +675,83 @@ function FormView() {
     // Identify branch nodes (nodes not in main flow but connected to main flow)
     const branchNodesMap = new Map(); // parentId -> [branch nodes]
 
+    // Helper function to find the ultimate main flow ancestor of a branch node
+    const findMainFlowAncestor = (nodeId, visited = new Set()) => {
+      if (visited.has(nodeId)) {
+        return null; // Cycle detected
+      }
+      visited.add(nodeId);
+
+      // If this node is in main flow, return it
+      if (mainFlowNodeIds.has(nodeId)) {
+        return nodeId;
+      }
+
+      // Check direct parents
+      const parentIds = parents.get(nodeId) || [];
+      for (const parentId of parentIds) {
+        if (mainFlowNodeIds.has(parentId)) {
+          return parentId; // Found direct main flow parent
+        }
+      }
+
+      // Recursively check branch node parents to find ultimate main flow ancestor
+      for (const parentId of parentIds) {
+        const ancestor = findMainFlowAncestor(parentId, visited);
+        if (ancestor) {
+          return ancestor;
+        }
+      }
+
+      // Also check if any child connects to main flow (reverse direction)
+      const childIds = children.get(nodeId) || [];
+      for (const childId of childIds) {
+        if (mainFlowNodeIds.has(childId)) {
+          // This branch node feeds into a main flow node
+          // Find which main flow node comes before this child in the flow
+          const childParents = parents.get(childId) || [];
+          const mainFlowParent = childParents.find(id => mainFlowNodeIds.has(id));
+          if (mainFlowParent) {
+            return mainFlowParent;
+          }
+        }
+      }
+
+      return null;
+    };
+
     nodes.forEach(node => {
       if (!mainFlowNodeIds.has(node.id)) {
-        // This is a branch node, find which main flow node it connects from
-        const parentIds = parents.get(node.id) || [];
-        const mainFlowParent = parentIds.find(id => mainFlowNodeIds.has(id));
+        // This is a branch node, find its ultimate main flow ancestor
+        const mainFlowAncestor = findMainFlowAncestor(node.id);
         
-        if (mainFlowParent) {
-          if (!branchNodesMap.has(mainFlowParent)) {
-            branchNodesMap.set(mainFlowParent, []);
+        if (mainFlowAncestor) {
+          if (!branchNodesMap.has(mainFlowAncestor)) {
+            branchNodesMap.set(mainFlowAncestor, []);
           }
-          branchNodesMap.get(mainFlowParent).push(node);
+          branchNodesMap.get(mainFlowAncestor).push(node);
+          console.log(`🔗 Branch node "${node.id}" (${extractTextFromHtml(node.label || node.id)}) associated with main flow node "${mainFlowAncestor}"`);
+        } else {
+          // Could not find main flow ancestor - log for debugging
+          console.warn(`⚠️  Branch node "${node.id}" (${extractTextFromHtml(node.label || node.id)}) has no main flow ancestor - may be orphaned`);
         }
       }
     });
+    
+    // Debug: Log branch nodes found
+    if (branchNodesMap.size > 0) {
+      console.log('🔍 Branch nodes detected:', Array.from(branchNodesMap.entries()).map(([parentId, branches]) => {
+        const parentNode = nodeMap.get(parentId);
+        const parentLabel = parentNode ? extractTextFromHtml(parentNode.label || parentNode.id) : parentId;
+        const branchLabels = branches.map(b => {
+          const label = extractTextFromHtml(b.label || b.id);
+          return `${b.id} (${label})`;
+        });
+        return `${parentLabel} [${parentId}]: [${branchLabels.join(', ')}]`;
+      }).join('; '));
+    } else {
+      console.log('⚠️  No branch nodes detected. Total nodes:', nodes.length, 'Main flow nodes:', mainFlowNodes.length);
+    }
 
     return { mainFlowNodes, branchNodes: branchNodesMap };
   };
@@ -369,36 +783,132 @@ function FormView() {
   // Get main flow nodes and branch nodes
   const { mainFlowNodes, branchNodes } = findMainFlow(nodes, connections);
   
+  // Track all branch node IDs that have been added to avoid duplicates across all nodes
+  const allAddedBranchIds = new Set();
+  
   // Merge branch nodes into subprocesses of their parent nodes
+  // CRITICAL: Display order should be: detected subprocesses (branch nodes) FIRST, then user-added ones
+  // This ensures new subprocesses always appear at the end
   const nodesWithBranches = mainFlowNodes.map(node => {
     const branchNodesForThis = branchNodes.get(node.id) || [];
-    // Add branch nodes as subprocesses if they're not already in subprocesses
-    const existingSubprocesses = (node.subprocesses || []).map(sub => 
+    
+    // Get user-added subprocesses from node state
+    const userAddedSubprocesses = (node.subprocesses || []).map(sub => 
       typeof sub === 'string' ? { name: sub, shape: 'rectangle' } : sub
     );
     
-    const branchSubprocesses = branchNodesForThis.map(branch => {
-      const label = extractTextFromHtml(branch.label || '');
-      return {
-        name: label || branch.id,
-        shape: branch.shape || 'rectangle'
-      };
-    });
+    // Get names AND IDs of user-added subprocesses (to avoid duplicates with branch nodes)
+    const userAddedSubprocessNames = new Set(
+      userAddedSubprocesses
+        .map(sub => (sub.name || '').trim().toLowerCase())
+        .filter(name => name.length > 0)
+    );
+    // Check both branchId (if it was a detected branch node that got saved) and any ID field
+    const userAddedSubprocessIds = new Set(
+      userAddedSubprocesses
+        .map(sub => {
+          // Check for branchId first (if it was a detected branch node)
+          if (sub.branchId) return sub.branchId;
+          // Also check if the name matches a branch node ID (for cases where name = ID)
+          if (sub.name && branchNodesForThis.some(b => b.id === sub.name)) {
+            return sub.name;
+          }
+          return null;
+        })
+        .filter(id => id)
+    );
     
-    // Merge but avoid duplicates by name
-    const allSubprocesses = [...existingSubprocesses];
-    branchSubprocesses.forEach(branchSub => {
-      const exists = allSubprocesses.some(existing => 
-        (typeof existing === 'string' ? existing : existing.name) === branchSub.name
-      );
-      if (!exists) {
-        allSubprocesses.push(branchSub);
-      }
-    });
+    // Convert branch nodes (detected subprocesses) to subprocess format
+    // Filter out deleted ones, ones that already exist in user-added list, and duplicates
+    const detectedSubprocesses = branchNodesForThis
+      .map((branch, branchIndex) => {
+        // Extract label - handle both HTML and plain text
+        let branchName = '';
+        if (branch.label) {
+          branchName = extractTextFromHtml(branch.label);
+        }
+        // Fallback to ID if label is empty or just whitespace
+        if (!branchName || !branchName.trim()) {
+          // Use the node ID as name (e.g., "s1", "s2", "s3", "s4")
+          branchName = branch.id || `Branch-${branchIndex}`;
+        }
+        
+        // Ensure we have a valid name (trim and use ID as final fallback)
+        branchName = branchName.trim();
+        if (!branchName) {
+          branchName = branch.id || `Subprocess-${branchIndex + 1}`;
+        }
+        
+        // Map shape correctly - ellipse should be 'ellipse', not 'circle'
+        let branchShape = branch.shape || 'rectangle';
+        if (branchShape === 'circle') {
+          branchShape = 'ellipse';
+        }
+        
+        return {
+          name: branchName,
+          shape: branchShape,
+          parent: 'main', // Default parent for branch nodes
+          isDetected: true, // Mark as detected for tracking
+          branchId: branch.id // Store original branch ID for reference
+        };
+      })
+      .filter(branchSub => {
+        const branchName = (branchSub.name || '').trim().toLowerCase();
+        const branchId = branchSub.branchId;
+        
+        // Filter out if:
+        // 1. Empty name
+        // 2. Already in user-added list (by name or by branchId)
+        // 3. Was deleted
+        // 4. Already added to another node (duplicate across nodes)
+        const shouldInclude = branchName.length > 0 && 
+               !userAddedSubprocessNames.has(branchName) &&
+               !userAddedSubprocessIds.has(branchId) &&
+               !deletedSubprocessNames.has(branchName) &&
+               !allAddedBranchIds.has(branchId);
+        
+        if (!shouldInclude && branchName.length > 0) {
+          console.log(`⚠️  Filtered out subprocess "${branchSub.name}" (${branchId}):`, {
+            inUserAddedByName: userAddedSubprocessNames.has(branchName),
+            inUserAddedById: userAddedSubprocessIds.has(branchId),
+            isDeleted: deletedSubprocessNames.has(branchName),
+            alreadyAddedToAnotherNode: allAddedBranchIds.has(branchId)
+          });
+        } else if (shouldInclude) {
+          // Mark this branch ID as added to prevent duplicates
+          allAddedBranchIds.add(branchId);
+        }
+        
+        return shouldInclude;
+      });
+    
+    // Debug: Log detected subprocesses
+    if (detectedSubprocesses.length > 0) {
+      console.log(`✅ Detected ${detectedSubprocesses.length} subprocess(es) for node "${extractTextFromHtml(node.label || node.id)}" [${node.id}]:`, 
+        detectedSubprocesses.map(s => `"${s.name}" (${s.shape}, branchId: ${s.branchId})`).join(', '));
+    } else if (branchNodesForThis.length > 0) {
+      console.warn(`⚠️  Found ${branchNodesForThis.length} branch node(s) but none passed filters for node "${extractTextFromHtml(node.label || node.id)}" [${node.id}]:`, 
+        branchNodesForThis.map(b => `${b.id} (${extractTextFromHtml(b.label || b.id)})`).join(', '));
+    }
+    
+    // Debug: Log detected subprocesses
+    if (detectedSubprocesses.length > 0) {
+      console.log(`✅ Detected ${detectedSubprocesses.length} subprocess(es) for node "${extractTextFromHtml(node.label || node.id)}" [${node.id}]:`, 
+        detectedSubprocesses.map(s => `"${s.name}" (${s.shape}, branchId: ${s.branchId})`).join(', '));
+    } else if (branchNodesForThis.length > 0) {
+      console.warn(`⚠️  Found ${branchNodesForThis.length} branch node(s) but none passed filters for node "${extractTextFromHtml(node.label || node.id)}" [${node.id}]:`, 
+        branchNodesForThis.map(b => `${b.id} (${extractTextFromHtml(b.label || b.id)})`).join(', '));
+    }
+    
+    // CRITICAL: Display order - detected subprocesses FIRST, then user-added ones
+    // This ensures new subprocesses always appear at the end
+    const allSubprocesses = [...detectedSubprocesses, ...userAddedSubprocesses];
 
     return {
       ...node,
-      subprocesses: allSubprocesses.length > 0 ? allSubprocesses : node.subprocesses,
+      // Use the merged list with detected first, then user-added
+      subprocesses: allSubprocesses,
       branchNodes: branchNodesForThis, // Store branch nodes for reference
     };
   });
@@ -427,6 +937,69 @@ function FormView() {
       <div className="form-view-header">
         <h2>Process Form View: {diagram.name}</h2>
         <div className="form-view-actions">
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => {
+              // Reload diagram data from server to sync with editor changes
+              setLoading(true);
+              // Clear deleted subprocess names so newly added subprocesses from editor can appear
+              setDeletedSubprocessNames(new Set());
+              
+              fetch(`http://localhost:3001/api/diagrams/${id}`)
+                .then((res) => {
+                  if (!res.ok) throw new Error('Failed to fetch diagram');
+                  return res.json();
+                })
+                .then((data) => {
+                  setDiagram(data);
+                  setProcessOwner(data.processOwner || '');
+                  
+                  if (data.parsedData?.nodes) {
+                    const editableNodes = data.parsedData.nodes.map((node, nodeIndex) => {
+                      // Process subprocesses from database (these are user-added ones)
+                      const processedSubprocesses = (node.subprocesses || []).map((sub, subIndex) => {
+                        const subObj = typeof sub === 'string' 
+                          ? { name: sub, shape: 'rectangle' } 
+                          : sub;
+                        if (!subObj.parent) {
+                          subObj.parent = subIndex === 0 ? 'main' : `subprocess-${subIndex - 1}`;
+                        }
+                        return subObj;
+                      });
+                      return {
+                        ...node,
+                        editedLabel: extractTextFromHtml(node.label || ''),
+                        owner: node.owner || '',
+                        subprocesses: processedSubprocesses,
+                      };
+                    });
+                    setNodes(editableNodes);
+                    setExpandedNodes(new Set(editableNodes.map(n => n.id)));
+                  } else {
+                    setNodes([]);
+                  }
+                  
+                  if (data.parsedData?.connections) {
+                    setConnections(data.parsedData.connections);
+                  } else {
+                    setConnections([]);
+                  }
+                  
+                  setLoading(false);
+                  alert('Form view refreshed from editor! New subprocesses added in the editor should now be visible.');
+                })
+                .catch((err) => {
+                  console.error(err);
+                  setError('Failed to refresh diagram');
+                  setLoading(false);
+                  alert('Failed to refresh. Please try again.');
+                });
+            }}
+            title="Refresh form view with latest changes from editor"
+          >
+            🔄 Refresh from Editor
+          </button>
           <button
             type="button"
             className="btn-secondary"
@@ -518,7 +1091,7 @@ function FormView() {
                     {isExpanded && (
                       <div className="node-content">
                       {/* Node Label/Content */}
-                      <div className="form-field" style={{ flex: '2', minWidth: '300px' }}>
+                      <div className="form-field" style={{ flex: '1.5', minWidth: '250px', maxWidth: '400px' }}>
                         <label htmlFor={`node-label-${node.id}`}>
                           Process Content:
                         </label>
@@ -535,7 +1108,7 @@ function FormView() {
                       </div>
 
                       {/* Node Owner */}
-                      <div className="form-field" style={{ flex: '1', minWidth: '200px' }}>
+                      <div className="form-field" style={{ flex: '1', minWidth: '180px', maxWidth: '250px' }}>
                         <label htmlFor={`node-owner-${node.id}`}>
                           Step Owner:
                         </label>
@@ -566,53 +1139,113 @@ function FormView() {
                         {node.subprocesses && node.subprocesses.length > 0 ? (
                           <div className="subprocesses-list">
                             {node.subprocesses.map((subprocess, subIndex) => {
+                              // CRITICAL: Use a stable key based on the subprocess itself, not just index
+                              // This prevents React from creating new elements on each render
+                              const subprocessKey = subprocess.branchId 
+                                ? `branch-${subprocess.branchId}` 
+                                : `user-${node.id}-${subIndex}-${subprocess.name || 'empty'}`;
+                              // Ensure subprocess is an object with all required fields
                               const subprocessObj = typeof subprocess === 'string' 
-                                ? { name: subprocess, shape: 'rectangle' }
-                                : subprocess;
+                                ? { name: subprocess, shape: 'rectangle', parent: subIndex === 0 ? 'main' : `subprocess-${subIndex - 1}` }
+                                : { 
+                                    name: subprocess.name || '', 
+                                    shape: subprocess.shape || 'rectangle', 
+                                    parent: subprocess.parent || (subIndex === 0 ? 'main' : `subprocess-${subIndex - 1}`),
+                                    isDetected: subprocess.isDetected || false,
+                                    branchId: subprocess.branchId || null
+                                  };
+                              
+                              // Build parent options: main step + ALL existing subprocesses (except current one)
+                              const parentOptions = [
+                                { value: 'main', label: `Main Step: ${node.editedLabel || 'Step'}` }
+                              ];
+                              
+                              // Add ALL existing subprocesses as parent options (except the current one)
+                              for (let i = 0; i < node.subprocesses.length; i++) {
+                                if (i === subIndex) continue; // Skip current subprocess
+                                const existingSub = node.subprocesses[i];
+                                const existingSubObj = typeof existingSub === 'string' 
+                                  ? { name: existingSub, shape: 'rectangle' } 
+                                  : existingSub;
+                                const subName = existingSubObj.name || `S${i + 1}`;
+                                // Only add if it has a name (don't show empty subprocesses)
+                                if (subName && subName.trim()) {
+                                  parentOptions.push({
+                                    value: `subprocess-${i}`,
+                                    label: `Subprocess: ${subName}`
+                                  });
+                                }
+                              }
+                              
+                              // Use the stable key we created above
                               return (
-                                <div key={subIndex} className="subprocess-item">
-                                  <input
-                                    type="text"
-                                    value={subprocessObj.name || ''}
-                                    onChange={(e) =>
-                                      handleSubprocessChange(
-                                        node.id,
-                                        subIndex,
-                                        'name',
-                                        e.target.value
-                                      )
-                                    }
-                                    placeholder="Subprocess name"
-                                    className="form-input subprocess-input"
-                                  />
-                                  <select
-                                    value={subprocessObj.shape || 'rectangle'}
-                                    onChange={(e) =>
-                                      handleSubprocessChange(
-                                        node.id,
-                                        subIndex,
-                                        'shape',
-                                        e.target.value
-                                      )
-                                    }
-                                    className="form-select subprocess-shape"
-                                  >
-                                    <option value="rectangle">Rectangle</option>
-                                    <option value="ellipse">Circle/Ellipse</option>
-                                    <option value="decision">Decision/Diamond</option>
-                                    <option value="data">Data/Parallelogram</option>
-                                    <option value="document">Document</option>
-                                    <option value="subprocess">Subprocess</option>
-                                  </select>
-                                  <button
-                                    type="button"
-                                    className="btn-remove"
-                                    onClick={() =>
-                                      handleRemoveSubprocess(node.id, subIndex)
-                                    }
-                                  >
-                                    ×
-                                  </button>
+                                <div key={subprocessKey} className="subprocess-item-wrapper">
+                                  <div className="subprocess-item">
+                                    <input
+                                      type="text"
+                                      value={subprocessObj.name || ''}
+                                      onChange={(e) =>
+                                        handleSubprocessChange(
+                                          node.id,
+                                          subIndex,
+                                          'name',
+                                          e.target.value
+                                        )
+                                      }
+                                      placeholder="Subprocess name"
+                                      className="form-input subprocess-input"
+                                    />
+                                    <select
+                                      value={subprocessObj.shape || 'rectangle'}
+                                      onChange={(e) =>
+                                        handleSubprocessChange(
+                                          node.id,
+                                          subIndex,
+                                          'shape',
+                                          e.target.value
+                                        )
+                                      }
+                                      className="form-select subprocess-shape"
+                                    >
+                                      <option value="rectangle">Rectangle</option>
+                                      <option value="ellipse">Circle/Ellipse</option>
+                                      <option value="decision">Decision/Diamond</option>
+                                      <option value="data">Data/Parallelogram</option>
+                                      <option value="document">Document</option>
+                                      <option value="subprocess">Subprocess</option>
+                                    </select>
+                                    <button
+                                      type="button"
+                                      className="btn-remove"
+                                      onClick={() =>
+                                        handleRemoveSubprocess(node.id, subIndex)
+                                      }
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                  <div className="subprocess-parent-row">
+                                    <label className="subprocess-parent-label">Connect to:</label>
+                                    <select
+                                      value={subprocessObj.parent || (subIndex === 0 ? 'main' : `subprocess-${subIndex - 1}`)}
+                                      onChange={(e) =>
+                                        handleSubprocessChange(
+                                          node.id,
+                                          subIndex,
+                                          'parent',
+                                          e.target.value
+                                        )
+                                      }
+                                      className="form-select subprocess-parent"
+                                      title="Select which node this subprocess connects to"
+                                    >
+                                      {parentOptions.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                          {option.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
                                 </div>
                               );
                             })}
