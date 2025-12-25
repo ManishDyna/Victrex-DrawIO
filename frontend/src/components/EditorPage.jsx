@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import DrawIOEditor from './DrawIOEditor';
 import FileUpload from './FileUpload';
+import FormView from './FormView';
 
 /**
  * EditorPage
  *
  * Hosts the upload button, save button, and the embedded draw.io editor.
  * Talks to the backend to persist diagrams in MongoDB.
+ * Also includes Form View toggle to switch between Diagram and Form views.
  */
 function EditorPage() {
   const [diagramXml, setDiagramXml] = useState(null);
@@ -24,6 +26,9 @@ function EditorPage() {
   const [convertRequestId, setConvertRequestId] = useState(0);
   const [pendingFile, setPendingFile] = useState(null);
   const [isNewFileUpload, setIsNewFileUpload] = useState(false); // Track if current diagram is from file upload
+  const [currentView, setCurrentView] = useState('diagram'); // 'diagram' or 'form'
+  
+  const formViewRef = useRef(null); // Ref for FormView to access save method
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -401,18 +406,67 @@ function EditorPage() {
   };
 
   /**
+   * Called when FormView save completes - reload diagram XML to sync changes
+   */
+  const handleFormSaveComplete = async (updatedDiagram) => {
+    console.log('📥 Form save complete, reloading diagram XML...');
+    
+    if (updatedDiagram && updatedDiagram.xml) {
+      // Reload the diagram XML to reflect form changes
+      setDiagramXml(updatedDiagram.xml);
+      console.log('✅ Diagram XML reloaded with form changes');
+    }
+    
+    // Reload process list to reflect any changes
+    loadProcessList();
+  };
+
+  /**
+   * Toggle between diagram and form view
+   * When switching to diagram view, reload the diagram to show any form changes
+   */
+  const handleViewToggle = async () => {
+    const newView = currentView === 'diagram' ? 'form' : 'diagram';
+    
+    // If switching to diagram view and we have an active process, reload it
+    if (newView === 'diagram' && activeProcessId) {
+      console.log('🔄 Switching to diagram view, reloading diagram...');
+      try {
+        const res = await fetch(`http://localhost:3001/api/diagrams/${activeProcessId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setDiagramXml(data.xml);
+          console.log('✅ Diagram reloaded with latest changes');
+        }
+      } catch (err) {
+        console.error('Failed to reload diagram:', err);
+      }
+    }
+    
+    setCurrentView(newView);
+  };
+
+  /**
    * When user clicks Save:
-   * - We trigger an export request into the embedded draw.io editor
-   * - The editor responds with an "export" event that we handle in handleExport
+   * - For Diagram view: trigger an export request into the embedded draw.io editor
+   * - For Form view: call the FormView save method
    */
   const handleSaveClick = () => {
-    if (!editorReady) {
-      alert('Editor is not ready yet.');
-      return;
-    }
+    if (currentView === 'form') {
+      // Call FormView's save method
+      if (formViewRef.current) {
+        formViewRef.current.save();
+      }
+    } else {
+      // Diagram view - export XML
+      if (!editorReady) {
+        alert('Editor is not ready yet.');
+        return;
+      }
 
-    setIsSaving(true);
-    setSaveRequestId((prev) => prev + 1);
+      setIsSaving(true);
+      setSaveRequestId((prev) => prev + 1);
+    }
   };
 
   const goToHistory = () => {
@@ -453,7 +507,7 @@ function EditorPage() {
           type="button"
           className="upload-button"
           onClick={handleSaveClick}
-          disabled={!editorReady || !diagramXml || isSaving}
+          disabled={currentView === 'diagram' ? (!editorReady || !diagramXml || isSaving) : false}
         >
           {isSaving ? 'Saving...' : 'Save Process'}
         </button>
@@ -470,9 +524,9 @@ function EditorPage() {
           <button
             type="button"
             className="upload-button secondary"
-            onClick={() => navigate(`/form/${activeProcessId}`)}
+            onClick={handleViewToggle}
           >
-            Form View
+            {currentView === 'diagram' ? 'Form View' : 'Diagram View'}
           </button>
         )}
       </div>
@@ -512,14 +566,25 @@ function EditorPage() {
         </aside>
 
         <div className="editor-main">
-          <DrawIOEditor
-            diagramXml={diagramXml}
-            onReady={() => setEditorReady(true)}
-            onExport={handleExport}
-            saveRequestId={saveRequestId}
-            convertRequestId={convertRequestId}
-            onLoad={handleDiagramLoad}
-          />
+          {currentView === 'diagram' ? (
+            <DrawIOEditor
+              diagramXml={diagramXml}
+              onReady={() => setEditorReady(true)}
+              onExport={handleExport}
+              saveRequestId={saveRequestId}
+              convertRequestId={convertRequestId}
+              onLoad={handleDiagramLoad}
+            />
+          ) : (
+            activeProcessId && (
+              <FormView 
+                ref={formViewRef} 
+                diagramId={activeProcessId} 
+                embedded={true}
+                onSaveComplete={handleFormSaveComplete}
+              />
+            )
+          )}
         </div>
       </div>
     </>

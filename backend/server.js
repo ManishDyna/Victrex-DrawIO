@@ -626,6 +626,7 @@ app.patch('/api/diagrams/:id', async (req, res) => {
       sourceFileName: doc.sourceFileName,
       processOwner: doc.processOwner,
       parsedData: doc.parsedData,
+      xml: doc.xml, // Include XML so diagram can be reloaded
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     });
