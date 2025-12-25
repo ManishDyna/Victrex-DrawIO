@@ -17,6 +17,10 @@ function inferShapeFromStyle(style = '') {
   if (s.includes('rhombus') || s.includes('diamond')) return 'decision';
   if (s.includes('parallelogram')) return 'data';
   if (s.includes('document')) return 'document';
+  // Check for subprocess/swimlane - draw.io uses various style strings
+  // Check for shape=swimlane or shape=subprocess in style first (more specific)
+  if (s.includes('shape=swimlane') || s.includes('shape=subprocess')) return 'subprocess';
+  // Then check for keywords in style string
   if (s.includes('swimlane') || s.includes('subprocess')) return 'subprocess';
 
   return 'rectangle';
@@ -296,6 +300,8 @@ function parseMxGraphXml(xml, defaultDiagramId = 'Page-1') {
 
   const nodes = [];
   const connections = [];
+  const edgeDebugLog = []; // Track edge detection for debugging
+  const allCellsWithSourceTarget = []; // Track all cells with source/target for debugging
 
   for (const cell of cells) {
     // Unwrap cell if it has nested mxCell structure
@@ -313,14 +319,36 @@ function parseMxGraphXml(xml, defaultDiagramId = 'Page-1') {
     const source = actualCell.source !== undefined ? actualCell.source : cell.source;
     const target = actualCell.target !== undefined ? actualCell.target : cell.target;
     
-    const isVertex = 
+    // Track all cells with source/target for debugging
+    if (source || target) {
+      allCellsWithSourceTarget.push({
+        cellId,
+        source: source ? String(source) : null,
+        target: target ? String(target) : null,
+        edge: edgeValue,
+        vertex: vertexValue,
+        hasBoth: !!(source && target)
+      });
+    }
+    
+    // CRITICAL: If a cell has both source and target, it's ALWAYS an edge/connection
+    // This must be checked FIRST before determining if it's a vertex
+    // Use explicit checks to handle 0, empty strings, etc.
+    const hasSourceAndTarget = (source !== undefined && source !== null && source !== '') && 
+                                (target !== undefined && target !== null && target !== '');
+    
+    // Determine if it's a vertex (only if it doesn't have source/target)
+    // Vertices are shapes/nodes, edges are connections
+    const isVertex = !hasSourceAndTarget && (
       vertexValue === 1 || 
       vertexValue === '1' || 
       vertexValue === true || 
       vertexValue === 'true' ||
-      (vertexValue !== undefined && edgeValue === undefined && !source && !target);
+      (vertexValue !== undefined && edgeValue === undefined)
+    );
     
-    const isEdge = 
+    // Determine if it's explicitly marked as an edge
+    const isExplicitEdge = 
       edgeValue === 1 || 
       edgeValue === '1' || 
       edgeValue === true || 
@@ -334,21 +362,139 @@ function parseMxGraphXml(xml, defaultDiagramId = 'Page-1') {
       // Get style from both locations
       const style = actualCell.style || cell.style || '';
       
+      const inferredShape = inferShapeFromStyle(style);
+      
+      // Log subprocess detection for debugging
+      if (inferredShape === 'subprocess') {
+        console.log(`   🔷 Subprocess detected: cell id=${cellId}, style preview: ${style.substring(0, 100)}`);
+      }
+      
       nodes.push({
         id: cellId,
         label: label,
-        shape: inferShapeFromStyle(style),
+        shape: inferredShape,
         x: geom.x != null ? Number(geom.x) : 0,
         y: geom.y != null ? Number(geom.y) : 0,
       });
     }
   
     /* ---------- edges ---------- */
-    if (isEdge && source && target) {
-      connections.push({
-        from: source,
-        to: target,
-      });
+    // PRIORITY: If it has source and target, it's ALWAYS a connection/edge
+    // This handles manually created connections in draw.io that might not have edge="1"
+    if (hasSourceAndTarget) {
+      const connection = {
+        from: String(source), // Ensure string IDs for consistency
+        to: String(target),
+      };
+      connections.push(connection);
+      edgeDebugLog.push(`✅ Edge found (source+target): ${connection.from} -> ${connection.to} (cell id=${cellId}, edge=${edgeValue}, vertex=${vertexValue})`);
+    } else if (isExplicitEdge && source && target) {
+      // Fallback: explicit edge attribute with source/target
+      const connection = {
+        from: String(source),
+        to: String(target),
+      };
+      connections.push(connection);
+      edgeDebugLog.push(`✅ Edge found (explicit edge attr): ${connection.from} -> ${connection.to} (cell id=${cellId})`);
+    } else if (source || target) {
+      // Log potential edge that's missing source or target (incomplete connection)
+      edgeDebugLog.push(`⚠️  Incomplete edge: cell ${cellId} has source=${source} but target=${target} (missing one endpoint)`);
+    } else if (isExplicitEdge) {
+      // Edge marked but no source/target - might be a template or incomplete
+      edgeDebugLog.push(`⚠️  Edge marked but no source/target: cell ${cellId} (edge=${edgeValue})`);
+    }
+  }
+  
+  // Log all cells with source/target for debugging
+  if (allCellsWithSourceTarget.length > 0) {
+    console.log(`🔍 Found ${allCellsWithSourceTarget.length} cells with source/target attributes:`);
+    allCellsWithSourceTarget.forEach(cellInfo => {
+      console.log(`   - Cell ${cellInfo.cellId}: source=${cellInfo.source}, target=${cellInfo.target}, edge=${cellInfo.edge}, vertex=${cellInfo.vertex}, hasBoth=${cellInfo.hasBoth}`);
+    });
+  }
+  
+  // Remove duplicate connections (same from->to pair)
+  const connectionMap = new Map();
+  const uniqueConnections = [];
+  
+  for (const conn of connections) {
+    const key = `${conn.from}->${conn.to}`;
+    if (!connectionMap.has(key)) {
+      connectionMap.set(key, conn);
+      uniqueConnections.push(conn);
+    } else {
+      console.log(`   🔄 Skipping duplicate connection: ${key}`);
+    }
+  }
+  
+  if (connections.length !== uniqueConnections.length) {
+    console.log(`🔄 Removed ${connections.length - uniqueConnections.length} duplicate connections`);
+  }
+  
+  connections.length = 0;
+  connections.push(...uniqueConnections);
+  
+  // Validate that all connection source/target IDs match existing node IDs
+  const nodeIds = new Set(nodes.map(n => String(n.id)));
+  const invalidConnections = connections.filter(conn => {
+    const fromExists = nodeIds.has(String(conn.from));
+    const toExists = nodeIds.has(String(conn.to));
+    return !fromExists || !toExists;
+  });
+  
+  if (invalidConnections.length > 0) {
+    console.warn(`⚠️  WARNING: Found ${invalidConnections.length} connections with invalid node IDs:`);
+    invalidConnections.forEach(conn => {
+      const fromExists = nodeIds.has(String(conn.from));
+      const toExists = nodeIds.has(String(conn.to));
+      console.warn(`   - Connection ${conn.from} -> ${conn.to}: from exists=${fromExists}, to exists=${toExists}`);
+      console.warn(`     Available node IDs: ${Array.from(nodeIds).slice(0, 10).join(', ')}${nodeIds.size > 10 ? '...' : ''}`);
+    });
+    
+    // Remove invalid connections
+    const validConnections = connections.filter(conn => {
+      const fromExists = nodeIds.has(String(conn.from));
+      const toExists = nodeIds.has(String(conn.to));
+      return fromExists && toExists;
+    });
+    
+    if (validConnections.length !== connections.length) {
+      console.log(`🗑️  Removed ${connections.length - validConnections.length} invalid connections`);
+      connections.length = 0;
+      connections.push(...validConnections);
+    }
+  } else if (connections.length > 0) {
+    console.log(`✅ All ${connections.length} connections have valid source/target node IDs`);
+  }
+  
+  // Log edge detection summary
+  if (edgeDebugLog.length > 0) {
+    console.log(`🔗 Edge detection summary (${edgeDebugLog.length} edge-related cells):`);
+    edgeDebugLog.forEach(log => console.log(`   ${log}`));
+  } else {
+    console.log(`⚠️  No edges detected! This might indicate a problem with edge detection.`);
+    console.log(`   Total cells processed: ${cells.length}`);
+    console.log(`   Total nodes found: ${nodes.length}`);
+    if (allCellsWithSourceTarget.length > 0) {
+      console.log(`   ⚠️  However, found ${allCellsWithSourceTarget.length} cells with source/target - these should be edges!`);
+    }
+  }
+  
+  // Additional debug: Log a sample of cells that might be edges but weren't detected
+  if (connections.length === 0 && cells.length > 0) {
+    console.log(`🔍 Debugging: No connections found. Checking first few cells for edge indicators...`);
+    for (let i = 0; i < Math.min(5, cells.length); i++) {
+      const cell = cells[i];
+      const actualCell = cell.mxCell || cell;
+      const hasSource = actualCell.source !== undefined || cell.source !== undefined;
+      const hasTarget = actualCell.target !== undefined || cell.target !== undefined;
+      const hasEdge = actualCell.edge !== undefined || cell.edge !== undefined;
+      const hasVertex = actualCell.vertex !== undefined || cell.vertex !== undefined;
+      
+      if (hasSource || hasTarget || hasEdge) {
+        console.log(`   Cell ${i} (id=${actualCell.id || cell.id}): source=${hasSource}, target=${hasTarget}, edge=${hasEdge}, vertex=${hasVertex}`);
+        console.log(`      Full cell structure:`, JSON.stringify(cell, null, 2).substring(0, 500));
+      }
     }
   }
   
@@ -375,6 +521,15 @@ function parseMxGraphXml(xml, defaultDiagramId = 'Page-1') {
   //   }
   // }
 
+  // Final summary
+  console.log(`\n📊 Parsing Summary:`);
+  console.log(`   - Total cells processed: ${cells.length}`);
+  console.log(`   - Nodes found: ${nodes.length}`);
+  console.log(`   - Unique connections found: ${connections.length}`);
+  if (connections.length > 0) {
+    console.log(`   - Sample connections: ${connections.slice(0, 3).map(c => `${c.from}->${c.to}`).join(', ')}${connections.length > 3 ? '...' : ''}`);
+  }
+  
   return {
     diagramId,
     nodes,

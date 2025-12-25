@@ -11,6 +11,7 @@ const express = require('express');
 const path = require('path');
 const mongoose = require('mongoose');
 const { parseMxGraphXml } = require('./utils/mxGraphParser');
+const { updateDiagramXml } = require('./utils/xmlUpdater');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -43,7 +44,10 @@ const diagramSchema = new mongoose.Schema(
           x: { type: Number },
           y: { type: Number },
           owner: { type: String }, // Owner name for this specific step
-          subprocesses: [{ type: String }], // Subprocess IDs if any
+          subprocesses: [{
+            name: { type: String },
+            shape: { type: String, default: 'rectangle' }
+          }], // Subprocesses with name and shape
         },
       ],
       connections: [
@@ -142,6 +146,28 @@ app.post('/api/diagrams', async (req, res) => {
 
     // Debug: Log XML structure info
     const isVSDX = sourceFileName?.toLowerCase().endsWith('.vsdx') || sourceFileName?.toLowerCase().endsWith('.vsd');
+    
+    // Count edges in XML before parsing
+    // NOTE: If XML is compressed (base64 in <diagram> tag), edges won't be visible in the string
+    // We'll count them after decompression in the parser
+    const isCompressedXml = xml.includes('<diagram') && !xml.includes('<mxGraphModel>');
+    let edgeCountInXml = 0;
+    let sourceTargetCount = 0;
+    let targetCount = 0;
+    
+    if (!isCompressedXml) {
+      // Only count edges if XML is uncompressed
+      edgeCountInXml = (xml.match(/edge="1"/g) || []).length;
+      sourceTargetCount = (xml.match(/source="[^"]+"/g) || []).length;
+      targetCount = (xml.match(/target="[^"]+"/g) || []).length;
+    } else {
+      // For compressed XML, we can't count edges in the base64 string
+      // The parser will count them after decompression
+      edgeCountInXml = -1; // -1 indicates compressed (unknown until decompressed)
+    }
+    
+    const cellsWithSourceTarget = sourceTargetCount > 0 ? Math.min(sourceTargetCount, targetCount) : 0;
+    
     console.log('\n📄 Diagram save request:');
     console.log(`   - Name: ${name}`);
     console.log(`   - Source: ${sourceFileName || 'manual'}`);
@@ -152,12 +178,31 @@ app.post('/api/diagrams', async (req, res) => {
     console.log(`   - Has <diagram>: ${xml.includes('<diagram')}`);
     console.log(`   - Has mxGraphModel: ${xml.includes('mxGraphModel')}`);
     console.log(`   - Has mxCell: ${xml.includes('mxCell')}`);
+    if (isCompressedXml) {
+      console.log(`   - XML is COMPRESSED (base64) - edges will be counted after decompression`);
+    } else {
+      console.log(`   - Edges in XML (edge="1"): ${edgeCountInXml}`);
+      console.log(`   - Cells with source: ${sourceTargetCount}, with target: ${targetCount}`);
+      console.log(`   - Estimated connections in XML: ${cellsWithSourceTarget}`);
+    }
 
     try {
       parsedData = parseMxGraphXml(xml, diagramId || 'Page-1');
-      console.log('✅ Parsed diagram successfully:', JSON.stringify(parsedData, null, 2));
+      console.log('✅ Parsed diagram successfully:');
       console.log(`   - Nodes: ${parsedData.nodes.length}`);
       console.log(`   - Connections: ${parsedData.connections.length}`);
+      
+      if (isCompressedXml) {
+        console.log(`   - XML was compressed - found ${parsedData.connections.length} connections after decompression`);
+      } else {
+        console.log(`   - Edges in XML: ${edgeCountInXml}, Parsed connections: ${parsedData.connections.length}`);
+        if (edgeCountInXml > 0 && parsedData.connections.length === 0) {
+          console.error('❌ CRITICAL: XML has edges but parser found 0 connections!');
+          console.error('   This indicates an edge detection problem in the parser.');
+        } else if (edgeCountInXml !== parsedData.connections.length) {
+          console.warn(`⚠️  WARNING: Edge count mismatch! XML has ${edgeCountInXml} edges, parser found ${parsedData.connections.length} connections.`);
+        }
+      }
       
       if (parsedData.nodes.length === 0 && parsedData.connections.length === 0) {
         console.warn('⚠️  WARNING: Parsed successfully but found 0 nodes and 0 connections!');
@@ -248,6 +293,30 @@ app.get('/api/diagrams/:id', async (req, res) => {
       return res.status(404).json({ error: 'Diagram not found.' });
     }
 
+    // Log XML structure when loading
+    if (doc.xml) {
+      const isCompressed = doc.xml.includes('<diagram') && !doc.xml.includes('<mxGraphModel>');
+      let edgeCountInXml = 0;
+      let sourceTargetCount = 0;
+      let targetCount = 0;
+      
+      if (!isCompressed) {
+        edgeCountInXml = (doc.xml.match(/edge="1"/g) || []).length;
+        sourceTargetCount = (doc.xml.match(/source="[^"]+"/g) || []).length;
+        targetCount = (doc.xml.match(/target="[^"]+"/g) || []).length;
+      }
+      
+      console.log(`\n📥 Loading diagram "${doc.name}" (ID: ${id}):`);
+      console.log(`   - XML length: ${doc.xml.length} chars`);
+      if (isCompressed) {
+        console.log(`   - XML is COMPRESSED (base64) - edges are encoded, will be visible after draw.io decompresses`);
+      } else {
+        console.log(`   - Edges in XML (edge="1"): ${edgeCountInXml}`);
+        console.log(`   - Cells with source: ${sourceTargetCount}, with target: ${targetCount}`);
+      }
+      console.log(`   - Parsed connections: ${doc.parsedData?.connections?.length || 0}`);
+    }
+
     return res.json({
       id: doc._id,
       name: doc.name,
@@ -329,10 +398,105 @@ app.patch('/api/diagrams/:id', async (req, res) => {
 
       if (parsedData.nodes) {
         doc.parsedData.nodes = parsedData.nodes;
+        
+        // Also update the XML to reflect changes in the diagram
+        try {
+          console.log('🔄 Updating diagram XML with form view changes...');
+          console.log(`   - Nodes to update: ${parsedData.nodes.length}`);
+          const nodesWithSubprocesses = parsedData.nodes.filter(n => 
+            n.subprocesses && n.subprocesses.length > 0
+          );
+          console.log(`   - Nodes with subprocesses: ${nodesWithSubprocesses.length}`);
+          
+          const updatedXml = updateDiagramXml(doc.xml, parsedData.nodes);
+          if (updatedXml && updatedXml !== doc.xml) {
+            doc.xml = updatedXml;
+            console.log('✅ Updated diagram XML with form view changes');
+            
+            // CRITICAL: Re-parse the updated XML to get ALL connections including newly added ones
+            // This ensures edges added for subprocesses are included in parsedData
+            try {
+              const diagramId = doc.parsedData?.diagramId || parsedData.diagramId || 'Page-1';
+              const reParsedData = parseMxGraphXml(updatedXml, diagramId);
+              
+              console.log(`   🔄 Re-parsed updated XML: ${reParsedData.nodes.length} nodes, ${reParsedData.connections.length} connections`);
+              
+              // Update connections with the re-parsed data (includes new subprocess edges)
+              if (reParsedData.connections && reParsedData.connections.length > 0) {
+                // Merge with form view connections to preserve any manual edits
+                const formConnections = parsedData.connections || [];
+                const reParsedConnections = reParsedData.connections;
+                
+                // Create a map to merge connections
+                const connectionMap = new Map();
+                reParsedConnections.forEach(conn => {
+                  const key = `${conn.from}->${conn.to}`;
+                  connectionMap.set(key, conn);
+                });
+                
+                // Add form view connections (these might have manual edits)
+                formConnections.forEach(conn => {
+                  const key = `${conn.from}->${conn.to}`;
+                  connectionMap.set(key, conn);
+                });
+                
+                const allConnections = Array.from(connectionMap.values());
+                console.log(`   🔗 Merged connections: ${reParsedConnections.length} from XML + ${formConnections.length} from form = ${allConnections.length} total`);
+                
+                // Update parsedData with merged connections
+                if (!doc.parsedData) {
+                  doc.parsedData = {};
+                }
+                doc.parsedData.connections = allConnections;
+              }
+            } catch (reParseError) {
+              console.warn('⚠️  Failed to re-parse updated XML for connections:', reParseError.message);
+              // Continue without failing - connections will be merged below
+            }
+          } else {
+            console.warn('⚠️  XML update returned same or empty XML');
+          }
+        } catch (xmlError) {
+          console.error('⚠️  Failed to update XML, keeping original:', xmlError.message);
+          console.error('   Error stack:', xmlError.stack);
+          // Continue without failing - parsedData is still updated
+        }
       }
 
+      // If connections weren't updated from XML re-parsing above, merge them now
+      // This handles cases where XML wasn't updated or re-parsing failed
       if (parsedData.connections) {
-        doc.parsedData.connections = parsedData.connections;
+        // Check if connections were already set from re-parsing
+        if (!doc.parsedData?.connections || doc.parsedData.connections.length === 0) {
+          // Merge connections from form view with existing connections from database
+          const existingConnections = doc.parsedData?.connections || [];
+          const formConnections = parsedData.connections;
+          
+          // Create a map of existing connections (from->to as key)
+          const existingConnMap = new Map();
+          existingConnections.forEach(conn => {
+            const key = `${conn.from}->${conn.to}`;
+            existingConnMap.set(key, conn);
+          });
+          
+          // Add/update connections from form view
+          formConnections.forEach(conn => {
+            const key = `${conn.from}->${conn.to}`;
+            existingConnMap.set(key, conn);
+          });
+          
+          // Convert back to array
+          const mergedConnections = Array.from(existingConnMap.values());
+          
+          console.log(`   🔗 Merging connections (fallback): ${existingConnections.length} existing + ${formConnections.length} from form = ${mergedConnections.length} total`);
+          
+          if (!doc.parsedData) {
+            doc.parsedData = {};
+          }
+          doc.parsedData.connections = mergedConnections;
+        } else {
+          console.log(`   ✅ Connections already updated from XML re-parsing (${doc.parsedData.connections.length} connections)`);
+        }
       }
 
       // Preserve other parsedData fields if they exist
