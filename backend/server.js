@@ -30,6 +30,8 @@ const diagramSchema = new mongoose.Schema(
     name: { type: String, required: true },
     xml: { type: String, required: true },
     sourceFileName: { type: String },
+    // Process owner information
+    processOwner: { type: String }, // Overall process owner
     // Parsed structure from XML
     parsedData: {
       diagramId: { type: String },
@@ -40,6 +42,8 @@ const diagramSchema = new mongoose.Schema(
           shape: { type: String },
           x: { type: Number },
           y: { type: Number },
+          owner: { type: String }, // Owner name for this specific step
+          subprocesses: [{ type: String }], // Subprocess IDs if any
         },
       ],
       connections: [
@@ -177,6 +181,7 @@ app.post('/api/diagrams', async (req, res) => {
       id: doc._id,
       name: doc.name,
       sourceFileName: doc.sourceFileName,
+      processOwner: doc.processOwner,
       parsedData: doc.parsedData,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
@@ -248,6 +253,7 @@ app.get('/api/diagrams/:id', async (req, res) => {
       name: doc.name,
       sourceFileName: doc.sourceFileName,
       xml: doc.xml,
+      processOwner: doc.processOwner,
       parsedData: doc.parsedData,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
@@ -283,6 +289,72 @@ app.get('/api/diagrams/:id/parsed', async (req, res) => {
   } catch (err) {
     console.error('Error fetching parsed diagram:', err);
     return res.status(500).json({ error: 'Failed to fetch parsed diagram.' });
+  }
+});
+
+/**
+ * PATCH /api/diagrams/:id
+ * Updates a diagram with owner information and edited content.
+ * 
+ * Body: { processOwner?: string, parsedData?: { nodes?: [...], connections?: [...] } }
+ */
+app.patch('/api/diagrams/:id', async (req, res) => {
+  try {
+    // Check if MongoDB is connected
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ 
+        error: 'Database not connected. Please check MongoDB connection.' 
+      });
+    }
+
+    const { id } = req.params;
+    const { processOwner, parsedData } = req.body;
+
+    const doc = await Diagram.findById(id);
+
+    if (!doc) {
+      return res.status(404).json({ error: 'Diagram not found.' });
+    }
+
+    // Update process owner if provided
+    if (processOwner !== undefined) {
+      doc.processOwner = processOwner;
+    }
+
+    // Update parsed data if provided
+    if (parsedData) {
+      if (!doc.parsedData) {
+        doc.parsedData = {};
+      }
+
+      if (parsedData.nodes) {
+        doc.parsedData.nodes = parsedData.nodes;
+      }
+
+      if (parsedData.connections) {
+        doc.parsedData.connections = parsedData.connections;
+      }
+
+      // Preserve other parsedData fields if they exist
+      if (parsedData.diagramId) {
+        doc.parsedData.diagramId = parsedData.diagramId;
+      }
+    }
+
+    await doc.save();
+
+    return res.json({
+      id: doc._id,
+      name: doc.name,
+      sourceFileName: doc.sourceFileName,
+      processOwner: doc.processOwner,
+      parsedData: doc.parsedData,
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt,
+    });
+  } catch (err) {
+    console.error('Error updating diagram:', err);
+    return res.status(500).json({ error: 'Failed to update diagram.' });
   }
 });
 

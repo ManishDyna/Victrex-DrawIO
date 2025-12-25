@@ -395,6 +395,16 @@ function EditorPage() {
         >
           View History
         </button>
+
+        {activeProcessId && (
+          <button
+            type="button"
+            className="upload-button secondary"
+            onClick={() => navigate(`/form/${activeProcessId}`)}
+          >
+            Form View
+          </button>
+        )}
       </div>
 
       <div className="editor-section editor-layout">

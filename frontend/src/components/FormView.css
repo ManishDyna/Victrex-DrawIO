@@ -1,0 +1,376 @@
+.form-view-container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  min-height: calc(100vh - 80px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.form-view-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #e0e0e0;
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 10;
+  padding-top: 10px;
+  padding-bottom: 15px;
+}
+
+.form-view-header h2 {
+  margin: 0;
+  color: #333;
+  font-size: 20px;
+}
+
+.form-view-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-primary,
+.btn-secondary {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.btn-primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #0056b3;
+}
+
+.btn-primary:disabled {
+  background-color: #6c757d;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background-color: #545b62;
+}
+
+.form-view-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-bottom: 20px;
+}
+
+.form-section {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 15px 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.form-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #007bff;
+}
+
+.form-section h3 {
+  margin: 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.expand-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-expand-all,
+.btn-collapse-all {
+  padding: 6px 12px;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background-color 0.2s;
+}
+
+.btn-expand-all:hover,
+.btn-collapse-all:hover {
+  background-color: #545b62;
+}
+
+.form-field {
+  margin-bottom: 10px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.form-field label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+  color: #555;
+  font-size: 12px;
+}
+
+.form-input,
+.form-textarea {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.form-input:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 36px;
+  max-height: 80px;
+}
+
+.form-empty {
+  color: #999;
+  font-style: italic;
+  text-align: center;
+  padding: 20px;
+}
+
+.nodes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.node-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 12px 15px;
+  background: #f9f9f9;
+  transition: box-shadow 0.2s;
+}
+
+.node-card:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.node-header-collapsible {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background: #f0f0f0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-bottom: 0;
+}
+
+.node-header-collapsible:hover {
+  background: #e0e0e0;
+}
+
+.node-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.node-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.node-label-preview {
+  flex: 1;
+  font-size: 13px;
+  color: #555;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 400px;
+}
+
+.node-owner-badge {
+  background-color: #007bff;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+}
+
+.node-expand-icon {
+  font-size: 12px;
+  color: #666;
+  min-width: 20px;
+  text-align: center;
+}
+
+.node-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.node-number {
+  font-weight: 600;
+  color: #007bff;
+  font-size: 14px;
+  min-width: 60px;
+}
+
+.node-shape-badge {
+  background-color: #6c757d;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  text-transform: capitalize;
+}
+
+.node-content {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 15px;
+  background: white;
+  border-top: 1px solid #e0e0e0;
+  margin-top: 0;
+}
+
+.node-connections {
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  font-size: 11px;
+  width: 100%;
+  flex-basis: 100%;
+}
+
+.connection-info {
+  margin: 5px 0;
+  color: #666;
+}
+
+.connection-info strong {
+  color: #333;
+}
+
+.subprocesses-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.subprocess-item {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.subprocess-input {
+  flex: 1;
+}
+
+.btn-add-subprocess {
+  margin-left: 10px;
+  padding: 6px 12px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background-color 0.2s;
+}
+
+.btn-add-subprocess:hover {
+  background-color: #218838;
+}
+
+.btn-remove {
+  padding: 6px 12px;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1;
+  transition: background-color 0.2s;
+}
+
+.btn-remove:hover {
+  background-color: #c82333;
+}
+
+.form-hint {
+  color: #999;
+  font-size: 13px;
+  font-style: italic;
+  margin: 5px 0;
+}
+
+.form-view-loading,
+.form-view-error {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+}
+
+.form-view-error {
+  color: #dc3545;
+}
+
+.form-view-error button {
+  margin-top: 20px;
+  padding: 10px 20px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.form-view-error button:hover {
+  background-color: #0056b3;
+}
+

@@ -2,6 +2,7 @@ import './App.css';
 import { Routes, Route, NavLink } from 'react-router-dom';
 import EditorPage from './components/EditorPage';
 import HistoryPage from './components/HistoryPage';
+import FormView from './components/FormView';
 
 /**
  * App component: defines top-level navigation and routes.
@@ -36,6 +37,7 @@ function App() {
         <Routes>
           <Route path="/" element={<EditorPage />} />
           <Route path="/history" element={<HistoryPage />} />
+          <Route path="/form/:id" element={<FormView />} />
         </Routes>
       </main>
     </div>
