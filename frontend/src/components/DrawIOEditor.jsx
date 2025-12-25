@@ -16,8 +16,10 @@ import { useEffect, useRef } from 'react';
  * - onReady: callback when editor has sent the 'init' event
  * - onExport: callback when an 'export' event is received from draw.io
  * - saveRequestId: monotonically increasing number to trigger an export request
+ * - convertRequestId: monotonically increasing number to trigger a conversion export
+ * - onLoad: callback when diagram has been loaded
  */
-function DrawIOEditor({ diagramXml, onReady, onExport, saveRequestId }) {
+function DrawIOEditor({ diagramXml, onReady, onExport, saveRequestId, convertRequestId, onLoad }) {
   const iframeRef = useRef(null);
   const isReadyRef = useRef(false);
   const lastSentXmlRef = useRef(null);
@@ -71,6 +73,9 @@ function DrawIOEditor({ diagramXml, onReady, onExport, saveRequestId }) {
           }
         } else if (data.event === 'load') {
           console.log('Diagram loaded successfully');
+          if (onLoad) {
+            onLoad();
+          }
         } else if (data.event === 'autosave') {
           console.log('Diagram modified');
         } else if (data.event === 'export') {
@@ -149,6 +154,26 @@ function DrawIOEditor({ diagramXml, onReady, onExport, saveRequestId }) {
       'http://localhost:3001'
     );
   }, [saveRequestId]);
+
+  useEffect(() => {
+    /**
+     * When convertRequestId changes, request an export for conversion.
+     * This is used to convert uploaded files to compressed XML format.
+     */
+    if (!convertRequestId || !isReadyRef.current || !iframeRef.current?.contentWindow) {
+      return;
+    }
+
+    const message = {
+      action: 'export',
+      format: 'xml',
+    };
+
+    iframeRef.current.contentWindow.postMessage(
+      JSON.stringify(message),
+      'http://localhost:3001'
+    );
+  }, [convertRequestId]);
 
   return (
     <div className="drawio-editor">
