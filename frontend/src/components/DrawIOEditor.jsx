@@ -1,5 +1,8 @@
 import { useEffect, useRef } from 'react';
 
+// API URL from environment variable or fallback to localhost
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
 /**
  * DrawIOEditor Component
  *
@@ -25,8 +28,8 @@ function DrawIOEditor({ diagramXml, onReady, onExport, saveRequestId, convertReq
   const lastSentXmlRef = useRef(null);
 
   useEffect(() => {
-    // Draw.io server URL (backend serves draw.io on port 3001)
-    const drawioUrl = 'http://localhost:3001/index.html?embed=1&proto=json&spin=1';
+    // Draw.io server URL (backend serves draw.io)
+    const drawioUrl = `${API_URL}/index.html?embed=1&proto=json&spin=1`;
     
     if (iframeRef.current) {
       iframeRef.current.src = drawioUrl;
@@ -45,7 +48,8 @@ function DrawIOEditor({ diagramXml, onReady, onExport, saveRequestId, convertReq
      */
     const handleMessage = (event) => {
       // Security: Only accept messages from our draw.io server
-      if (event.origin !== 'http://localhost:3001') {
+      const allowedOrigin = new URL(API_URL).origin;
+      if (event.origin !== allowedOrigin) {
         return;
       }
 
@@ -64,9 +68,10 @@ function DrawIOEditor({ diagramXml, onReady, onExport, saveRequestId, convertReq
               action: 'load',
               xml: diagramXml
             };
+            const allowedOrigin = new URL(API_URL).origin;
             iframeRef.current.contentWindow.postMessage(
               JSON.stringify(message),
-              'http://localhost:3001'
+              allowedOrigin
             );
             lastSentXmlRef.current = diagramXml;
             console.log('Sent diagram to draw.io editor (on init)');
@@ -118,9 +123,10 @@ function DrawIOEditor({ diagramXml, onReady, onExport, saveRequestId, convertReq
       };
       
       // Send message to draw.io iframe
+      const allowedOrigin = new URL(API_URL).origin;
       iframeRef.current.contentWindow.postMessage(
         JSON.stringify(message),
-        'http://localhost:3001'
+        allowedOrigin
       );
       
       lastSentXmlRef.current = diagramXml;
@@ -149,9 +155,10 @@ function DrawIOEditor({ diagramXml, onReady, onExport, saveRequestId, convertReq
       format: 'xml',
     };
 
+    const allowedOrigin = new URL(API_URL).origin;
     iframeRef.current.contentWindow.postMessage(
       JSON.stringify(message),
-      'http://localhost:3001'
+      allowedOrigin
     );
   }, [saveRequestId]);
 
@@ -169,9 +176,10 @@ function DrawIOEditor({ diagramXml, onReady, onExport, saveRequestId, convertReq
       format: 'xml',
     };
 
+    const allowedOrigin = new URL(API_URL).origin;
     iframeRef.current.contentWindow.postMessage(
       JSON.stringify(message),
-      'http://localhost:3001'
+      allowedOrigin
     );
   }, [convertRequestId]);
 

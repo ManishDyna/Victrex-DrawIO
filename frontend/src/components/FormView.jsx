@@ -2,6 +2,9 @@ import { useEffect, useState, useRef, forwardRef, useImperativeHandle } from 're
 import { useParams, useNavigate } from 'react-router-dom';
 import './FormView.css';
 
+// API URL from environment variable or fallback to localhost
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
 /**
  * FormView Component
  * 
@@ -45,7 +48,7 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
 
     const loadData = () => {
       setLoading(true);
-      fetch(`http://localhost:3001/api/diagrams/${id}`)
+      fetch(`${API_URL}/api/diagrams/${id}`)
         .then((res) => {
           if (!res.ok) {
             throw new Error('Failed to fetch diagram');
@@ -450,7 +453,7 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
     try {
       // First, fetch the latest diagram data to ensure we have the most recent connections
       // This prevents overwriting Editor changes that happened after FormView loaded
-      const latestResponse = await fetch(`http://localhost:3001/api/diagrams/${id}`);
+      const latestResponse = await fetch(`${API_URL}/api/diagrams/${id}`);
       if (!latestResponse.ok) {
         throw new Error('Failed to fetch latest diagram data');
       }
@@ -524,7 +527,7 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
       if (hasNewNodes) {
         // If there are new nodes, use the rebuild endpoint to regenerate XML
         console.log('   ⚠️ New nodes detected, using rebuild endpoint');
-        response = await fetch(`http://localhost:3001/api/diagrams/${id}/rebuild`, {
+        response = await fetch(`${API_URL}/api/diagrams/${id}/rebuild`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -537,7 +540,7 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
         });
       } else {
         // Otherwise, use normal PATCH to update existing nodes
-        response = await fetch(`http://localhost:3001/api/diagrams/${id}`, {
+        response = await fetch(`${API_URL}/api/diagrams/${id}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -560,7 +563,7 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
       const updated = await response.json();
       
       // Reload the diagram to get fresh data after save
-      const reloadResponse = await fetch(`http://localhost:3001/api/diagrams/${id}`);
+      const reloadResponse = await fetch(`${API_URL}/api/diagrams/${id}`);
       if (reloadResponse.ok) {
         const reloadedDiagram = await reloadResponse.json();
         setDiagram(reloadedDiagram);
@@ -1019,7 +1022,7 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
                 // Clear deleted subprocess names so newly added subprocesses from editor can appear
                 setDeletedSubprocessNames(new Set());
                 
-                fetch(`http://localhost:3001/api/diagrams/${id}`)
+                fetch(`${API_URL}/api/diagrams/${id}`)
                   .then((res) => {
                     if (!res.ok) throw new Error('Failed to fetch diagram');
                     return res.json();

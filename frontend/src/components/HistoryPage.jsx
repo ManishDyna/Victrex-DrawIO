@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+// API URL from environment variable or fallback to localhost
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
 /**
  * HistoryPage
  *
@@ -17,7 +20,7 @@ function HistoryPage() {
     setLoading(true);
     setError(null);
 
-    fetch('http://localhost:3001/api/diagrams')
+    fetch(`${API_URL}/api/diagrams`)
       .then((res) => {
         if (!res.ok) {
           throw new Error('Failed to fetch diagrams');

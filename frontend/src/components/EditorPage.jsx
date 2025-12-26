@@ -5,6 +5,9 @@ import FileUpload from './FileUpload';
 import FormView from './FormView';
 import CreateProcessModal from './CreateProcessModal';
 
+// API URL from environment variable or fallback to localhost
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
 /**
  * EditorPage
  *
@@ -47,7 +50,7 @@ function EditorPage() {
     setIsLoadingList(true);
     setListError(null);
 
-    fetch('http://localhost:3001/api/diagrams')
+    fetch(`${API_URL}/api/diagrams`)
       .then((res) => {
         if (!res.ok) {
           throw new Error('Failed to fetch process list');
@@ -146,7 +149,7 @@ function EditorPage() {
     }
 
     if (diagramId) {
-      fetch(`http://localhost:3001/api/diagrams/${diagramId}`)
+      fetch(`${API_URL}/api/diagrams/${diagramId}`)
         .then((res) => {
           if (!res.ok) {
             throw new Error('Failed to fetch diagram');
@@ -421,8 +424,8 @@ function EditorPage() {
       // If this is a new file upload OR no lastSavedId, always create new (POST)
       // If editing existing diagram (has lastSavedId and NOT new file), update (PUT)
       const url = (!isNewFile && lastSavedId)
-        ? `http://localhost:3001/api/diagrams/${lastSavedId}`
-        : 'http://localhost:3001/api/diagrams';
+        ? `${API_URL}/api/diagrams/${lastSavedId}`
+        : `${API_URL}/api/diagrams`;
       const method = (!isNewFile && lastSavedId) ? 'PUT' : 'POST';
       
       const res = await fetch(url, {
@@ -523,7 +526,7 @@ function EditorPage() {
     if (newView === 'diagram' && activeProcessId) {
       console.log('🔄 Switching to diagram view, reloading diagram...');
       try {
-        const res = await fetch(`http://localhost:3001/api/diagrams/${activeProcessId}`);
+        const res = await fetch(`${API_URL}/api/diagrams/${activeProcessId}`);
         if (res.ok) {
           const data = await res.json();
           setDiagramXml(data.xml);
@@ -573,7 +576,7 @@ function EditorPage() {
   const handleSelectProcess = (item) => {
     if (!item?.id) return;
 
-    fetch(`http://localhost:3001/api/diagrams/${item.id}`)
+    fetch(`${API_URL}/api/diagrams/${item.id}`)
       .then((res) => {
         if (!res.ok) {
           throw new Error('Failed to fetch diagram');
@@ -610,7 +613,7 @@ function EditorPage() {
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/api/diagrams/${processId}/name`, {
+      const response = await fetch(`${API_URL}/api/diagrams/${processId}/name`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -652,7 +655,7 @@ function EditorPage() {
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/api/diagrams/${item.id}`, {
+      const response = await fetch(`${API_URL}/api/diagrams/${item.id}`, {
         method: 'DELETE',
       });
 
