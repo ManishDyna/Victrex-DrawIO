@@ -31,6 +31,7 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [processName, setProcessName] = useState('');
   const [processOwner, setProcessOwner] = useState('');
   const [nodes, setNodes] = useState([]);
   const [connections, setConnections] = useState([]);
@@ -63,6 +64,7 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
           });
           
           setDiagram(data);
+          setProcessName(data.name || '');
           setProcessOwner(data.processOwner || '');
           
           // Initialize nodes with editable content
@@ -93,8 +95,8 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
               };
             });
             setNodes(editableNodes);
-            // Expand all nodes by default
-            setExpandedNodes(new Set(editableNodes.map(n => n.id)));
+            // Keep all nodes collapsed by default
+            setExpandedNodes(new Set());
             
             console.log('📋 FormView: Initialized nodes:', editableNodes.map(n => ({
               id: n.id,
@@ -546,6 +548,7 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
+            name: processName,
             processOwner,
             parsedData: {
               ...latestDiagram.parsedData, // Use latest parsedData as base
@@ -1100,19 +1103,31 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
       )}
 
       <div className="form-view-content">
-        {/* Process Owner Section */}
+        {/* Process Name and Owner Section */}
         <div className="form-section">
-          <h3>Process Owner</h3>
-          <div className="form-field">
-            <label htmlFor="process-owner">Whole Process Owner Name:</label>
-            <input
-              id="process-owner"
-              type="text"
-              value={processOwner}
-              onChange={(e) => setProcessOwner(e.target.value)}
-              placeholder="Enter process owner name"
-              className="form-input"
-            />
+          <div className="process-info-grid">
+            <div className="form-field">
+              <label htmlFor="process-name">Process:</label>
+              <input
+                id="process-name"
+                type="text"
+                value={processName}
+                onChange={(e) => setProcessName(e.target.value)}
+                placeholder="Enter process name"
+                className="form-input"
+              />
+            </div>
+            <div className="form-field">
+              <label htmlFor="process-owner">Process Owner:</label>
+              <input
+                id="process-owner"
+                type="text"
+                value={processOwner}
+                onChange={(e) => setProcessOwner(e.target.value)}
+                placeholder="Enter process owner name"
+                className="form-input"
+              />
+            </div>
           </div>
         </div>
 

@@ -952,7 +952,7 @@ function EditorPage() {
                   )}
                   {item.processOwner && (
                     <div className="process-list-owner">
-                      Owner: {item.processOwner}
+                      {item.processOwner}
                     </div>
                   )}
                   <div className="process-list-meta">
