@@ -77,6 +77,8 @@ function EditorPage() {
   // Store file or empty diagram from header navigation (Upload Diagram or Create Process)
   useEffect(() => {
     const uploadedFile = location.state?.uploadedFile;
+    const savedProcessId = location.state?.savedProcessId;
+    const openInFormView = location.state?.openInFormView;
     const emptyDiagram = location.state?.emptyDiagram;
     const processName = location.state?.processName;
     const processOwner = location.state?.processOwner;
@@ -97,9 +99,50 @@ function EditorPage() {
         navigate(location.pathname + location.search, { replace: true, state: {} });
       }, 0);
     }
-    // Handle empty diagram from Create Process without file
+    // Handle auto-saved empty process from App.jsx Create Process
+    else if (savedProcessId && openInFormView) {
+      console.log('📥 Received saved process ID from App.jsx:', savedProcessId);
+      
+      // Load the saved process
+      fetch(`http://localhost:3001/api/diagrams/${savedProcessId}`)
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error('Failed to fetch saved diagram');
+          }
+          return res.json();
+        })
+        .then((data) => {
+          console.log('✅ Loaded saved empty process:', data.name);
+          setDiagramXml(data.xml);
+          setLastSavedId(data.id);
+          setActiveProcessId(data.id);
+          setIsNewFileUpload(false);
+          
+          // Clear file states
+          setPendingHeaderFile(null);
+          setPendingFile(null);
+          processedFileRef.current = null;
+          
+          // Open in Form View
+          setCurrentView('form');
+          
+          // Refresh process list
+          loadProcessList();
+        })
+        .catch((err) => {
+          console.error('❌ Failed to load saved process:', err);
+          alert('Failed to load the created process.');
+        });
+      
+      // Clear the state to prevent re-processing on page refresh
+      setTimeout(() => {
+        navigate(location.pathname + location.search, { replace: true, state: {} });
+      }, 0);
+    }
+    // Handle empty diagram from Create Process without file (OLD METHOD - for backward compatibility)
     else if (emptyDiagram && isNew) {
-      console.log('Received empty diagram for new process:', processName);
+      console.log('⚠️  Received empty diagram via OLD method (no auto-save):', processName);
+      console.log('   This should not happen if using the new Create Process flow');
       setPendingProcessName(processName);
       setPendingProcessOwner(processOwner);
       setIsNewProcess(true);
@@ -691,7 +734,12 @@ function EditorPage() {
   };
 
   // Handle Create Process modal continue
-  const handleCreateModalContinue = (data) => {
+  const handleCreateModalContinue = async (data) => {
+    console.log('🎯 handleCreateModalContinue CALLED');
+    console.log('   Current view:', currentView);
+    console.log('   Active process ID:', activeProcessId);
+    console.log('   Data received:', data);
+    
     const { processName, ownerName, file } = data;
 
     console.log('🚀 Create Process Modal Continue:', {
@@ -716,7 +764,7 @@ function EditorPage() {
       
       console.log('   - File upload state set. Editor will process when ready.');
     } else {
-      // If no file, create empty diagram
+      // If no file, create empty diagram and auto-save it
       console.log('📝 Creating empty process:', processName);
       const emptyXml = `<mxfile host="app.diagrams.net" modified="${new Date().toISOString()}" agent="Victrex Flowstudio" version="21.1.2" etag="${Date.now()}" type="device">
   <diagram name="Page-1" id="page-${Date.now()}">
@@ -729,24 +777,75 @@ function EditorPage() {
   </diagram>
 </mxfile>`;
       
-      console.log('✅ Setting empty diagram XML (length:', emptyXml.length, ')');
-      console.log('✅ Setting pendingProcessName:', processName);
-      console.log('✅ Setting pendingProcessOwner:', ownerName);
+      console.log('✅ Creating and auto-saving empty process...');
+      console.log('   Process Name:', processName);
+      console.log('   Owner Name:', ownerName);
+      console.log('   XML Length:', emptyXml.length);
       
-      setPendingProcessName(processName);
-      setPendingProcessOwner(ownerName);
-      setIsNewProcess(true);
-      setIsNewFileUpload(true);
-      setLastSavedId(null);
-      setActiveProcessId(null);
-      setDiagramXml(emptyXml);
-      setCurrentView('diagram'); // Start with diagram view (can switch to form to add steps)
-      
-      console.log('✅ Empty process setup complete. You should now see the diagram editor.');
+      try {
+        console.log('📡 About to make POST request to /api/diagrams');
+        
+        // Auto-save the empty process immediately so it gets an ID
+        const res = await fetch('http://localhost:3001/api/diagrams', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: processName,
+            xml: emptyXml,
+            processOwner: ownerName || undefined,
+          }),
+        });
+
+        console.log('📡 Fetch completed. Status:', res.status, res.statusText);
+
+        if (!res.ok) {
+          console.error('❌ Response not OK:', res.status, res.statusText);
+          throw new Error(`Failed to create process: ${res.status} ${res.statusText}`);
+        }
+
+        console.log('📥 Parsing response JSON...');
+        const data = await res.json();
+        console.log('📥 Response data:', data);
+        
+        console.log('✅ Empty process auto-saved with ID:', data.id);
+        
+        // Clear any pending file states to prevent loading spinner
+        setPendingHeaderFile(null);
+        setPendingFile(null);
+        processedFileRef.current = null;
+        
+        // Set the saved process as active
+        setLastSavedId(data.id);
+        setActiveProcessId(data.id);
+        setDiagramXml(emptyXml);
+        setIsNewFileUpload(false); // Already saved, so not a new upload anymore
+        setIsNewProcess(false);
+        
+        // Refresh the process list
+        loadProcessList();
+        
+        // Start with Form View for empty processes (easier to add steps)
+        setCurrentView('form');
+        
+        console.log('✅ Empty process created and ready for editing in Form View');
+      } catch (err) {
+        console.error('❌ Failed to auto-save empty process:', err);
+        console.error('   Error name:', err.name);
+        console.error('   Error message:', err.message);
+        console.error('   Error stack:', err.stack);
+        alert(`Failed to create process: ${err.message}\nPlease check the console and backend logs.`);
+        return;
+      }
     }
     
     // Close the modal
     console.log('✅ Closing Create Process modal');
+    console.log('   Final state before closing:');
+    console.log('   - activeProcessId:', activeProcessId);
+    console.log('   - currentView:', currentView);
+    console.log('   - lastSavedId:', lastSavedId);
     setIsCreateModalOpen(false);
   };
 

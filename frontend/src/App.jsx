@@ -51,11 +51,19 @@ function App() {
     setIsCreateModalOpen(false);
   };
 
-  const handleCreateModalContinue = (data) => {
+  const handleCreateModalContinue = async (data) => {
     const { processName, ownerName, file } = data;
+
+    console.log('🚀 App.jsx: Create Process Modal Continue:', {
+      processName,
+      ownerName,
+      hasFile: !!file,
+      fileName: file?.name
+    });
 
     if (file) {
       // If file is uploaded, navigate to editor with file and metadata
+      console.log('📁 App.jsx: Creating process with file');
       navigate('/editor', { 
         state: { 
           uploadedFile: file,
@@ -64,16 +72,47 @@ function App() {
         } 
       });
     } else {
-      // If no file, navigate to editor with empty diagram and metadata
-      const emptyDiagram = createEmptyDiagram();
-      navigate('/editor', { 
-        state: { 
-          emptyDiagram,
-          processName,
-          processOwner: ownerName,
-          isNewProcess: true
-        } 
-      });
+      // If no file, create empty diagram and auto-save it
+      console.log('📝 App.jsx: Creating empty process:', processName);
+      const emptyXml = createEmptyDiagram();
+      
+      console.log('✅ App.jsx: Auto-saving empty process...');
+      
+      try {
+        // Auto-save the empty process immediately so it gets an ID
+        const res = await fetch('http://localhost:3001/api/diagrams', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: processName,
+            xml: emptyXml,
+            processOwner: ownerName || undefined,
+          }),
+        });
+
+        if (!res.ok) {
+          throw new Error(`Failed to create process: ${res.status} ${res.statusText}`);
+        }
+
+        const savedProcess = await res.json();
+        
+        console.log('✅ App.jsx: Empty process auto-saved with ID:', savedProcess.id);
+        
+        // Navigate to editor with the saved process ID
+        navigate('/editor', { 
+          state: { 
+            savedProcessId: savedProcess.id,
+            openInFormView: true // Signal to open in Form View
+          } 
+        });
+        
+      } catch (err) {
+        console.error('❌ App.jsx: Failed to auto-save empty process:', err);
+        alert(`Failed to create process: ${err.message}\nPlease check the console and backend logs.`);
+        return;
+      }
     }
   };
 
