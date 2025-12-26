@@ -1,0 +1,237 @@
+{
+  "_id": {
+    "$oid": "694e48efad143ee3806ced3a"
+  },
+  "name": "customer support",
+  "xml": "<mxfile host=\"localhost\" agent=\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0\" version=\"29.2.9\"><diagram name=\"Page-1\" id=\"Page-1\">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</diagram></mxfile>",
+  "sourceFileName": "customer support.vsdx",
+  "parsedData": {
+    "diagramId": "Page-1",
+    "nodes": [
+      {
+        "id": "2",
+        "label": "<p>Receive Customer Complaint</p>",
+        "shape": "rectangle",
+        "x": 149,
+        "y": 80,
+        "owner": "",
+        "subprocesses": [
+          {
+            "name": "Node1",
+            "shape": "rectangle",
+            "parent": "main",
+            "_id": {
+              "$oid": "694e4904ad143ee3806ced79"
+            }
+          },
+          {
+            "name": "Node2",
+            "shape": "rectangle",
+            "parent": "subprocess-0",
+            "_id": {
+              "$oid": "694e49d4ad143ee3806ceddd"
+            }
+          },
+          {
+            "name": "Node3",
+            "shape": "rectangle",
+            "parent": "subprocess-1",
+            "_id": {
+              "$oid": "694e4a0cad143ee3806cee4f"
+            }
+          }
+        ],
+        "_id": {
+          "$oid": "694e48efad143ee3806ced3b"
+        }
+      },
+      {
+        "id": "3",
+        "label": "<p>Identify Order Reference</p>",
+        "shape": "rectangle",
+        "x": 149,
+        "y": 161,
+        "owner": "",
+        "subprocesses": [],
+        "_id": {
+          "$oid": "694e48efad143ee3806ced3c"
+        }
+      },
+      {
+        "id": "4",
+        "label": "<p>Investigate Issue</p>",
+        "shape": "rectangle",
+        "x": 149,
+        "y": 241,
+        "owner": "",
+        "subprocesses": [],
+        "_id": {
+          "$oid": "694e48efad143ee3806ced3d"
+        }
+      },
+      {
+        "id": "5",
+        "label": "<p>Initiate Replacement/Refund</p>",
+        "shape": "rectangle",
+        "x": 149,
+        "y": 321,
+        "owner": "",
+        "subprocesses": [],
+        "_id": {
+          "$oid": "694e48efad143ee3806ced3e"
+        }
+      },
+      {
+        "id": "6",
+        "label": "<p>Close Ticket</p>",
+        "shape": "rectangle",
+        "x": 149,
+        "y": 401,
+        "owner": "",
+        "subprocesses": [],
+        "_id": {
+          "$oid": "694e48efad143ee3806ced3f"
+        }
+      },
+      {
+        "id": "7",
+        "label": "<p>Order Fulfillment</p>",
+        "shape": "rectangle",
+        "x": 368,
+        "y": 161,
+        "owner": "",
+        "subprocesses": [],
+        "_id": {
+          "$oid": "694e48efad143ee3806ced40"
+        }
+      }
+    ],
+    "connections": [
+      {
+        "from": "10000",
+        "to": "10001",
+        "style": "edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;",
+        "id": "50002",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e49d4ad143ee3806cede4"
+        }
+      },
+      {
+        "from": "2",
+        "to": "10000",
+        "style": "edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;",
+        "id": "50000",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e4904ad143ee3806ced7f"
+        }
+      },
+      {
+        "from": "10000",
+        "to": "10002",
+        "style": "edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;",
+        "id": "50003",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e4a0cad143ee3806cee57"
+        }
+      },
+      {
+        "from": "10002",
+        "to": "10003",
+        "style": "edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;",
+        "id": "50004",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e4a0cad143ee3806cee58"
+        }
+      },
+      {
+        "from": "2",
+        "to": "3",
+        "style": "vsdxID=14;edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;spacingTop=0;spacingBottom=0;spacingLeft=0;spacingRight=0;verticalAlign=middle;html=1;labelBackgroundColor=#ffffff;rounded=0;exitX=0.506578947368421;exitY=1.024390243902439;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.506578947368421;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;",
+        "id": "8",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e48efad143ee3806ced41"
+        }
+      },
+      {
+        "from": "3",
+        "to": "7",
+        "style": "vsdxID=37;edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;spacingTop=0;spacingBottom=0;spacingLeft=0;spacingRight=0;verticalAlign=middle;html=1;labelBackgroundColor=#ffffff;rounded=0;exitX=1.006578947368421;exitY=0.4878048780487805;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.4878048780487805;entryDx=0;entryDy=0;entryPerimeter=0;",
+        "id": "9",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e48efad143ee3806ced42"
+        }
+      },
+      {
+        "from": "3",
+        "to": "4",
+        "style": "vsdxID=32;edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;spacingTop=0;spacingBottom=0;spacingLeft=0;spacingRight=0;verticalAlign=middle;html=1;labelBackgroundColor=#ffffff;rounded=0;exitX=0.506578947368421;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.506578947368421;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;",
+        "id": "10",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e48efad143ee3806ced43"
+        }
+      },
+      {
+        "from": "4",
+        "to": "5",
+        "style": "vsdxID=33;edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;spacingTop=0;spacingBottom=0;spacingLeft=0;spacingRight=0;verticalAlign=middle;html=1;labelBackgroundColor=#ffffff;rounded=0;exitX=0.506578947368421;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.506578947368421;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;",
+        "id": "11",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e48efad143ee3806ced44"
+        }
+      },
+      {
+        "from": "5",
+        "to": "6",
+        "style": "vsdxID=34;edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;spacingTop=0;spacingBottom=0;spacingLeft=0;spacingRight=0;verticalAlign=middle;html=1;labelBackgroundColor=#ffffff;rounded=0;exitX=0.506578947368421;exitY=1.024390243902439;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.506578947368421;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;",
+        "id": "12",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e48efad143ee3806ced45"
+        }
+      }
+    ]
+  },
+  "createdAt": {
+    "$date": "2025-12-26T08:35:59.863Z"
+  },
+  "updatedAt": {
+    "$date": "2025-12-26T08:40:44.925Z"
+  },
+  "__v": 3,
+  "processOwner": "Manish Soni"
+}

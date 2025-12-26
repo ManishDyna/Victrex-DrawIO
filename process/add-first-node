@@ -1,0 +1,182 @@
+{
+  "_id": {
+    "$oid": "694e48efad143ee3806ced3a"
+  },
+  "name": "customer support",
+  "xml": "<mxfile host=\"localhost\" agent=\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0\" version=\"29.2.9\"><diagram name=\"Page-1\" id=\"Page-1\">7Zpbb6M4FMc/jaXdh43ABkIeA0x6UaftJO328kbBECaAkXGun35lwFyS0HbSphnNEkVR/Ld9wPb52fhggMxodUbtZPqduDgEUHJXAFkAQlmGGoCQK+tc0XQ9F3wauEWhSpgEG1yIUqHOAxenjYKMkJAFSVN0SBxjhzU0m1KybBbzSNi8amL7eEeYOHa4qz4ELpvmqq5KlX6OA38qrixLRU5ki8KFkE5tlyxrEvoGkEkJYfm/aGXikHee6Je83qglt7wximO2p8J9iunNy0/eJ1AK7Rcc5oUA1EIGkOEGCwA1n/8VUiKEMXZwsMAASuY8ZSTClP8lURLaQcxEcQBHybYJAEcNw9l42X4xCIbtzHxK5rGb54i2wLI7ymbW21U0NWVrMSoLTFng2OEwDPwYICsKXJfnGXYhODhmmAJkkAWmXpj1+zIfP2ORuqsLCyBLBsjwgjA0SUhoZhh52Qcgw6e2G+CYibyYxNx+OrUTfg8pw7EThH/Fz8aVRYa+9W18K23Q5GL9Ey+lyf3Yn1gAGlfzwez7M3m8mi6vBzcAGmw+G4b0Orn05cnGOld+PAA4uh/710/+893s51C5ny0v7/2zx9gH0NCsR3lz5UVkHbmPRO6vpuomGl9qPxRoPJieA8ml5w4pgMbTAkBjeDswX/o3l+gcwBG8PJPPr882AI50ZRbeTW//NR2ArL95KxglM1xrtpR9uAuQIGbZaKkGUA2ppwJoygCaElAtAE2gGlkq0ytNpBtae7lKVS2AjMw7K9/Y6vJMw9xT+A1OWRQWQ7ecBgxPEtvhA7KkdlJ6HHcPvKo5T+FbZ5hEmNE1gNK0Bq1SONiyAlxWYa4JK8ogTxfTmF5AbRee7ZeWKwIBHBXuLJI1Jj/M6IWLYxZ4vC031M0IHWMPUxw7+PMJRachVOkI7Qg9jFBZk0+OaLzAKQt8m/Gl9CJN50cgUzkNmbBDs0PzQDTLOqdEM2BBzuUYJ6Ht4IgjA0dj7GWIfTam6okwVTtMO0wPwxTBk2NqhiTljN4FzgwfYeOpnYZKJHVUdlQeRqUinZxKsd8czUPuxPnK+dlo9k+Eptah2aH5PjSRpn/tlrNJjpmHvAltgqPvgoPdnSD3LklkTh1ci8c24Spjpnzfx+1NikzBALMpG/KAe6Xh2BXKS0icmShWRPnVvEgt1e6CaWI7QezfkaQY8kIwCGMkampX2GNNZVwMK5dap4maE7X4Xn0qaDogXgXskf/vqZKm9vWB0kearkC5yHvihnsSVNCg+inyrFXNiLWuJW4xDSKczVm5FjO6br0Mz3yql6wMZ6l1PbVtWvgW9THbjfjVEKE4tBl/N9B40bLH34uqtyR7Y1CuZrBZg3heyh/sKj6GlNrrWoli8mm1CMUbJgGhIvcktfnqZLdKT6yirbUAHOW3UlFbdsPXgDz4OMioHWTU70BuB1nuSa0gSz1F7+tS9aN+gOQGuXsNfxzl/lFQ/kf+bJQRLCEsudTlV1HeW0XqDQa/F8qydFyWYcfygYvy770IK0ch9yOLcOMx9qspkj9OkfIKRaij6I+kSD3S+oeO/SyLpHc8y6pitWuv9RssgHuO+Pwquuor6Ha70v/HrlT7kxZEaQj4mT3x3XfIL3O0VjgqEvaFvWquIyKUNLuyCIjZ4Ry/P+p7TVws/2qcd1/QbavZu9+twS2jbfuPYNUDdOKsZT2Qp712VEsqxu+Ve9oax7cHTa0GrdHFW0P29dNVzSHKfW5jX/vGRrZl0/rWLjVv+YExyDr8JQ0HONGvzBBv2hZXeHV9f6eV6m63V3Z960CTOBL9tsu+yz7aPjB1mP3m08U7hmVnojyAvUyvjk7nJqsD6Ojbfw==</diagram></mxfile>",
+  "sourceFileName": "customer support.vsdx",
+  "parsedData": {
+    "diagramId": "Page-1",
+    "nodes": [
+      {
+        "id": "2",
+        "label": "<p>Receive Customer Complaint</p>",
+        "shape": "rectangle",
+        "x": 149,
+        "y": 80,
+        "owner": "",
+        "subprocesses": [
+          {
+            "name": "Node1",
+            "shape": "rectangle",
+            "parent": "main",
+            "_id": {
+              "$oid": "694e4904ad143ee3806ced79"
+            }
+          }
+        ],
+        "_id": {
+          "$oid": "694e48efad143ee3806ced3b"
+        }
+      },
+      {
+        "id": "3",
+        "label": "<p>Identify Order Reference</p>",
+        "shape": "rectangle",
+        "x": 149,
+        "y": 161,
+        "owner": "",
+        "subprocesses": [],
+        "_id": {
+          "$oid": "694e48efad143ee3806ced3c"
+        }
+      },
+      {
+        "id": "4",
+        "label": "<p>Investigate Issue</p>",
+        "shape": "rectangle",
+        "x": 149,
+        "y": 241,
+        "owner": "",
+        "subprocesses": [],
+        "_id": {
+          "$oid": "694e48efad143ee3806ced3d"
+        }
+      },
+      {
+        "id": "5",
+        "label": "<p>Initiate Replacement/Refund</p>",
+        "shape": "rectangle",
+        "x": 149,
+        "y": 321,
+        "owner": "",
+        "subprocesses": [],
+        "_id": {
+          "$oid": "694e48efad143ee3806ced3e"
+        }
+      },
+      {
+        "id": "6",
+        "label": "<p>Close Ticket</p>",
+        "shape": "rectangle",
+        "x": 149,
+        "y": 401,
+        "owner": "",
+        "subprocesses": [],
+        "_id": {
+          "$oid": "694e48efad143ee3806ced3f"
+        }
+      },
+      {
+        "id": "7",
+        "label": "<p>Order Fulfillment</p>",
+        "shape": "rectangle",
+        "x": 368,
+        "y": 161,
+        "owner": "",
+        "subprocesses": [],
+        "_id": {
+          "$oid": "694e48efad143ee3806ced40"
+        }
+      }
+    ],
+    "connections": [
+      {
+        "from": "2",
+        "to": "10000",
+        "style": "edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;",
+        "id": "50000",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e4904ad143ee3806ced7f"
+        }
+      },
+      {
+        "from": "2",
+        "to": "3",
+        "style": "vsdxID=14;edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;spacingTop=0;spacingBottom=0;spacingLeft=0;spacingRight=0;verticalAlign=middle;html=1;labelBackgroundColor=#ffffff;rounded=0;exitX=0.506578947368421;exitY=1.024390243902439;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.506578947368421;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;",
+        "id": "8",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e48efad143ee3806ced41"
+        }
+      },
+      {
+        "from": "3",
+        "to": "7",
+        "style": "vsdxID=37;edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;spacingTop=0;spacingBottom=0;spacingLeft=0;spacingRight=0;verticalAlign=middle;html=1;labelBackgroundColor=#ffffff;rounded=0;exitX=1.006578947368421;exitY=0.4878048780487805;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.4878048780487805;entryDx=0;entryDy=0;entryPerimeter=0;",
+        "id": "9",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e48efad143ee3806ced42"
+        }
+      },
+      {
+        "from": "3",
+        "to": "4",
+        "style": "vsdxID=32;edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;spacingTop=0;spacingBottom=0;spacingLeft=0;spacingRight=0;verticalAlign=middle;html=1;labelBackgroundColor=#ffffff;rounded=0;exitX=0.506578947368421;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.506578947368421;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;",
+        "id": "10",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e48efad143ee3806ced43"
+        }
+      },
+      {
+        "from": "4",
+        "to": "5",
+        "style": "vsdxID=33;edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;spacingTop=0;spacingBottom=0;spacingLeft=0;spacingRight=0;verticalAlign=middle;html=1;labelBackgroundColor=#ffffff;rounded=0;exitX=0.506578947368421;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.506578947368421;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;",
+        "id": "11",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e48efad143ee3806ced44"
+        }
+      },
+      {
+        "from": "5",
+        "to": "6",
+        "style": "vsdxID=34;edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;spacingTop=0;spacingBottom=0;spacingLeft=0;spacingRight=0;verticalAlign=middle;html=1;labelBackgroundColor=#ffffff;rounded=0;exitX=0.506578947368421;exitY=1.024390243902439;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.506578947368421;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;",
+        "id": "12",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e48efad143ee3806ced45"
+        }
+      }
+    ]
+  },
+  "createdAt": {
+    "$date": "2025-12-26T08:35:59.863Z"
+  },
+  "updatedAt": {
+    "$date": "2025-12-26T08:36:20.124Z"
+  },
+  "__v": 1,
+  "processOwner": "Manish Soni"
+}

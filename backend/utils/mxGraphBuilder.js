@@ -36,21 +36,21 @@ function escapeXml(str) {
  * @param {string} parsedData.diagramId - Diagram ID (default: 'Page-1')
  * @param {Array} parsedData.nodes - Array of node objects with id, label, shape, x, y
  * @param {Array} parsedData.connections - Array of connection objects with from, to
+ * @param {boolean} parsedData.wrapInMxFile - Whether to wrap in mxfile structure (default: true)
  * @returns {string} - XML string in draw.io mxGraphModel format
  */
 function buildMxGraphXml(parsedData) {
-  const { diagramId = 'Page-1', nodes = [], connections = [] } = parsedData;
+  const { diagramId = 'Page-1', nodes = [], connections = [], wrapInMxFile = true } = parsedData;
 
-
-  // Build XML string manually to match draw.io format exactly
-  let xml = '<mxGraphModel dx="1484" dy="645" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">\n';
-  xml += '  <root>\n';
+  // Build mxGraphModel XML
+  let graphModel = '<mxGraphModel dx="1484" dy="645" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">\n';
+  graphModel += '  <root>\n';
   
   // Root cell (id="0")
-  xml += '    <mxCell id="0"/>\n';
+  graphModel += '    <mxCell id="0"/>\n';
   
   // Parent cell (id="1", parent="0")
-  xml += '    <mxCell id="1" parent="0"/>\n';
+  graphModel += '    <mxCell id="1" parent="0"/>\n';
   
   // Node cells (vertices)
   nodes.forEach((node) => {
@@ -59,22 +59,37 @@ function buildMxGraphXml(parsedData) {
     const height = node.shape === 'ellipse' ? 80 : 60; // Default height
     const value = escapeXml(node.label || '');
     
-    xml += `    <mxCell id="${escapeXml(node.id)}" value="${value}" style="${escapeXml(style)}" vertex="1" parent="1">\n`;
-    xml += `      <mxGeometry x="${node.x || 0}" y="${node.y || 0}" width="${width}" height="${height}" as="geometry"/>\n`;
-    xml += '    </mxCell>\n';
+    graphModel += `    <mxCell id="${escapeXml(node.id)}" value="${value}" style="${escapeXml(style)}" vertex="1" parent="1">\n`;
+    graphModel += `      <mxGeometry x="${node.x || 0}" y="${node.y || 0}" width="${width}" height="${height}" as="geometry"/>\n`;
+    graphModel += '    </mxCell>\n';
   });
   
   // Connection cells (edges)
   connections.forEach((conn, index) => {
     const edgeId = `edge_${conn.from}_${conn.to}_${index}`;
     
-    xml += `    <mxCell id="${escapeXml(edgeId)}" edge="1" parent="1" source="${escapeXml(conn.from)}" target="${escapeXml(conn.to)}" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;">\n`;
-    xml += '      <mxGeometry relative="1" as="geometry"/>\n';
-    xml += '    </mxCell>\n';
+    graphModel += `    <mxCell id="${escapeXml(edgeId)}" edge="1" parent="1" source="${escapeXml(conn.from)}" target="${escapeXml(conn.to)}" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;">\n`;
+    graphModel += '      <mxGeometry relative="1" as="geometry"/>\n';
+    graphModel += '    </mxCell>\n';
   });
   
-  xml += '  </root>\n';
-  xml += '</mxGraphModel>';
+  graphModel += '  </root>\n';
+  graphModel += '</mxGraphModel>';
+  
+  // If wrapInMxFile is false, return just the mxGraphModel
+  if (!wrapInMxFile) {
+    return graphModel;
+  }
+  
+  // Otherwise, wrap in mxfile structure with proper diagram tag
+  const timestamp = new Date().toISOString();
+  const etag = `etag-${Date.now()}`;
+  
+  let xml = `<mxfile host="app.diagrams.net" modified="${timestamp}" agent="Victrex Flowstudio" version="21.1.2" etag="${etag}" type="device">\n`;
+  xml += `  <diagram name="${escapeXml(diagramId)}" id="${escapeXml(diagramId)}">\n`;
+  xml += `    ${graphModel}\n`;
+  xml += '  </diagram>\n';
+  xml += '</mxfile>';
   
   return xml;
 }

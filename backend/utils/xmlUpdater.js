@@ -279,6 +279,9 @@ function updateDiagramXml(xml, updatedNodes) {
     console.log(`   🔢 Max existing ID: ${maxId}, Starting subprocess IDs from: ${nextSubprocessId}, Starting edge IDs from: ${nextEdgeId}`);
     console.log(`   📊 Existing IDs in XML: ${cellIdMap.size} total`);
     
+    // CRITICAL FIX: Track global subprocess counter to ensure sequential IDs
+    let globalSubprocessCounter = 0;
+    
     updatedNodes.forEach(node => {
       if (!node.subprocesses || node.subprocesses.length === 0) return;
       
@@ -292,7 +295,9 @@ function updateDiagramXml(xml, updatedNodes) {
       // Track subprocess IDs as we create them for parent lookup
       const subprocessIdMap = new Map(); // Maps subprocess index to its node ID
       
-      node.subprocesses.forEach((subprocess, index) => {
+      // STEP 1: Remove ALL existing subprocess nodes for this parent to avoid ID conflicts
+      console.log(`\n   🧹 Removing all existing subprocess nodes for parent ${node.id}...`);
+      node.subprocesses.forEach((subprocess) => {
         const subprocessObj = typeof subprocess === 'string' 
           ? { name: subprocess, shape: 'rectangle' }
           : subprocess;
@@ -302,37 +307,51 @@ function updateDiagramXml(xml, updatedNodes) {
         const normalizedName = subprocessObj.name.toLowerCase();
         const existingSub = existingSubprocessMap.get(normalizedName);
         
-        let subprocessId;
-        let shouldCreateNode = true;
-        let shouldUpdateShape = false;
-        let needsNewEdge = false;
-        
         if (existingSub && existingSub.parentNodeId === String(node.id)) {
-          // Subprocess already exists for this parent node
-          subprocessId = existingSub.id;
-          shouldCreateNode = false;
-          shouldUpdateShape = true; // Always check if shape needs updating
-          console.log(`   🔄 Found existing subprocess "${subprocessObj.name}" with ID ${subprocessId}`);
-        } else if (existingSub) {
-          // Subprocess exists but for a different parent - create new one
-          subprocessId = nextSubprocessId++;
-          while (cellIdMap.has(String(subprocessId))) {
-            subprocessId = nextSubprocessId++;
-          }
-          console.log(`   ⚠️  Subprocess "${subprocessObj.name}" exists for different parent, creating new one with ID ${subprocessId}`);
-        } else {
-          // Create new node with unique ID
-          subprocessId = nextSubprocessId++;
-          while (cellIdMap.has(String(subprocessId))) {
-            subprocessId = nextSubprocessId++;
-          }
-          console.log(`   ✨ Creating new subprocess node "${subprocessObj.name}" with ID ${subprocessId}`);
+          console.log(`   🗑️  Removing old subprocess "${subprocessObj.name}" (ID: ${existingSub.id})`);
+          
+          // Remove the node
+          const nodePattern = new RegExp(`<mxCell[^>]*id="${existingSub.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*>[\\s\\S]*?<\\/mxCell>`, 'g');
+          updatedXml = updatedXml.replace(nodePattern, '');
+          
+          // Remove all edges connected to this node
+          const edgeToPattern = new RegExp(`<mxCell[^>]*edge="1"[^>]*target="${existingSub.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*>[\\s\\S]*?<\\/mxCell>`, 'g');
+          updatedXml = updatedXml.replace(edgeToPattern, '');
+          
+          const edgeFromPattern = new RegExp(`<mxCell[^>]*edge="1"[^>]*source="${existingSub.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*>[\\s\\S]*?<\\/mxCell>`, 'g');
+          updatedXml = updatedXml.replace(edgeFromPattern, '');
+          
+          // Remove from cellIdMap
+          cellIdMap.delete(String(existingSub.id));
         }
+      });
+      console.log(`   ✅ Old subprocess nodes removed\n`);
+      
+      // STEP 2: Now create all subprocess nodes with sequential IDs
+      node.subprocesses.forEach((subprocess, index) => {
+        const subprocessObj = typeof subprocess === 'string' 
+          ? { name: subprocess, shape: 'rectangle' }
+          : subprocess;
+        
+        if (!subprocessObj.name || !subprocessObj.name.trim()) return;
+        
+        // 🔧 PERMANENT FIX: Use sequential IDs based on global counter
+        // This ensures subprocess IDs ALWAYS match their array position
+        // Formula: 10000 + globalSubprocessCounter
+        const subprocessId = 10000 + globalSubprocessCounter;
+        globalSubprocessCounter++;
+        
+        const shouldCreateNode = true; // Always create (we removed old ones above)
+        const shouldUpdateShape = false;
+        
+        console.log(`   ✨ Creating subprocess "${subprocessObj.name}" with sequential ID ${subprocessId} at index ${index}`);
         
         // CRITICAL: Add subprocess ID to cellIdMap so edges can reference it
         cellIdMap.set(String(subprocessId), true);
         // Also track in subprocessIdMap for parent lookup
+        // Now index ALWAYS matches the ID formula: 10000 + index
         subprocessIdMap.set(index, subprocessId);
+        console.log(`   📍 Mapped subprocess[${index}] "${subprocessObj.name}" → ID ${subprocessId}`);
         
         // Get shape style
         const getShapeStyle = (shape) => {
@@ -354,19 +373,6 @@ function updateDiagramXml(xml, updatedNodes) {
         };
         
         const style = getShapeStyle(subprocessObj.shape || 'rectangle');
-        
-        // Update shape if subprocess exists and shape changed
-        if (shouldUpdateShape && !shouldCreateNode) {
-          const shapeUpdatePattern = new RegExp(
-            `(<mxCell[^>]*id="${subprocessId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*style=")[^"]*("[^>]*>)`,
-            'i'
-          );
-          const shapeMatch = updatedXml.match(shapeUpdatePattern);
-          if (shapeMatch) {
-            updatedXml = updatedXml.replace(shapeUpdatePattern, `$1${style}$2`);
-            console.log(`   ✅ Updated shape for subprocess "${subprocessObj.name}" to ${subprocessObj.shape || 'rectangle'}`);
-          }
-        }
         
         // Calculate initial position for subprocess
         let subprocessX = parentPos.x + parentWidth + spacing;
@@ -441,20 +447,7 @@ function updateDiagramXml(xml, updatedNodes) {
           console.log(`   ⏭️  Skipped creating subprocess node "${subprocessObj.name}" - already exists with ID ${subprocessId}`);
         }
         
-        // STEP: Remove OLD edges connected to this subprocess (both incoming and outgoing)
-        // This ensures we don't have duplicate edges when parent changes
-        console.log(`   🔗 Checking for existing edges to subprocess ${subprocessId}...`);
-        const oldEdgeToPattern = new RegExp(`<mxCell[^>]*edge="1"[^>]*target="${subprocessId.toString().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*>[\\s\\S]*?<\\/mxCell>`, 'g');
-        let removedEdges = 0;
-        updatedXml = updatedXml.replace(oldEdgeToPattern, (match) => {
-          removedEdges++;
-          console.log(`   🗑️  Removed old edge to subprocess ${subprocessId}`);
-          return '';
-        });
-        
-        if (removedEdges > 0) {
-          console.log(`   ✅ Removed ${removedEdges} old edge(s) to subprocess "${subprocessObj.name}"`);
-        }
+        // Note: No need to remove old edges here - we already removed all old subprocess nodes and their edges above
         
         // IMPORTANT: Get source ID BEFORE checking for existing edges
         // Verify source ID exists in XML
@@ -507,6 +500,15 @@ function updateDiagramXml(xml, updatedNodes) {
         } else if (subprocessObj.parent.startsWith('subprocess-')) {
           // Connect to previous subprocess
           const parentSubprocessIndex = parseInt(subprocessObj.parent.replace('subprocess-', ''));
+          
+          // DEBUG: Log parent lookup details
+          console.log(`\n   ⚡⚡⚡ PARENT LOOKUP DEBUG for subprocess "${subprocessObj.name}" (index ${index}) ⚡⚡⚡`);
+          console.log(`   📍 subprocessObj.parent="${subprocessObj.parent}"`);
+          console.log(`   📍 parentSubprocessIndex=${parentSubprocessIndex}`);
+          console.log(`   📍 currentIndex=${index}`);
+          console.log(`   📍 SubprocessIdMap entries:`, Array.from(subprocessIdMap.entries()));
+          console.log(`   📍 Checking if ${parentSubprocessIndex} >= 0 && ${parentSubprocessIndex} < ${index}:`, (parentSubprocessIndex >= 0 && parentSubprocessIndex < index));
+          
           if (parentSubprocessIndex >= 0 && parentSubprocessIndex < index) {
             // First try to find parent subprocess ID from subprocessIdMap (if we've already created it)
             if (subprocessIdMap.has(parentSubprocessIndex)) {
@@ -522,7 +524,7 @@ function updateDiagramXml(xml, updatedNodes) {
               const parentSubprocessName = typeof parentSubprocess === 'string' 
                 ? parentSubprocess 
                 : (parentSubprocess.name || `S${parentSubprocessIndex + 1}`);
-              console.log(`   🔗 Subprocess "${subprocessObj.name}" will connect to subprocess "${parentSubprocessName}" (${parentNodeId}) [from map]`);
+              console.log(`   ✅ Subprocess "${subprocessObj.name}" (index ${index}) CORRECTLY connecting to "${parentSubprocessName}" (index ${parentSubprocessIndex}, ID ${parentNodeId}) [from map]`);
             } else {
               // Parent subprocess not created yet, search in XML for existing one
               const parentSubprocess = node.subprocesses[parentSubprocessIndex];
@@ -588,7 +590,10 @@ function updateDiagramXml(xml, updatedNodes) {
         
         // ALWAYS create a NEW connector for subprocesses - never modify existing connectors
         // Each subprocess should have its own dedicated connector arrow from the selected parent
-        console.log(`   🔗 Creating NEW connector from ${parentNodeId === actualSourceId ? 'main step' : 'parent subprocess'} to subprocess ${subprocessObj.name} (${subprocessId})`);
+        console.log(`\n   🔗🔗🔗 CREATING EDGE 🔗🔗🔗`);
+        console.log(`   From: ${parentNodeId} (${parentNodeId === actualSourceId ? 'main step' : 'parent subprocess'})`);
+        console.log(`   To: ${subprocessId} (subprocess "${subprocessObj.name}", index ${index})`);
+        console.log(`   actualSourceId (main step): ${actualSourceId}`);
         
         // Create edge/connection from selected parent node to subprocess
         {

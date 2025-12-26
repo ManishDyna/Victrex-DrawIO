@@ -1,9 +1,10 @@
 import './App.css';
 import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import EditorPage from './components/EditorPage';
 import HistoryPage from './components/HistoryPage';
 import FormView from './components/FormView';
+import CreateProcessModal from './components/CreateProcessModal';
 
 /**
  * App component: defines top-level navigation and routes.
@@ -11,6 +12,7 @@ import FormView from './components/FormView';
 function App() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const handleUploadClick = (e) => {
     e.preventDefault();
@@ -41,6 +43,55 @@ function App() {
     event.target.value = '';
   };
 
+  const handleCreateProcess = () => {
+    setIsCreateModalOpen(true);
+  };
+
+  const handleCreateModalClose = () => {
+    setIsCreateModalOpen(false);
+  };
+
+  const handleCreateModalContinue = (data) => {
+    const { processName, ownerName, file } = data;
+
+    if (file) {
+      // If file is uploaded, navigate to editor with file and metadata
+      navigate('/editor', { 
+        state: { 
+          uploadedFile: file,
+          processName,
+          processOwner: ownerName
+        } 
+      });
+    } else {
+      // If no file, navigate to editor with empty diagram and metadata
+      const emptyDiagram = createEmptyDiagram();
+      navigate('/editor', { 
+        state: { 
+          emptyDiagram,
+          processName,
+          processOwner: ownerName,
+          isNewProcess: true
+        } 
+      });
+    }
+  };
+
+  const createEmptyDiagram = () => {
+    // Create a minimal empty draw.io diagram XML
+    const emptyXml = `<mxfile host="app.diagrams.net" modified="${new Date().toISOString()}" agent="Victrex Flowstudio" version="21.1.2" etag="${Date.now()}" type="device">
+  <diagram name="Page-1" id="page-${Date.now()}">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>`;
+    return emptyXml;
+  };
+
   return (
     <div className="app">
       <header className="app-header">
@@ -60,12 +111,19 @@ function App() {
             <span>Available Processes</span>
           </NavLink>
           <button
+            onClick={handleCreateProcess}
+            className="nav-link nav-link-create"
+          >
+            <i className="fa fa-plus-circle"></i>
+            <span>Create Process</span>
+          </button>
+          {/* <button
             onClick={handleUploadClick}
             className="nav-link nav-link-upload"
           >
             <i className="fa fa-upload"></i>
             <span>Upload Diagram</span>
-          </button>
+          </button> */}
           <input
             ref={fileInputRef}
             type="file"
@@ -84,6 +142,12 @@ function App() {
           <Route path="/form/:id" element={<FormView />} />
         </Routes>
       </main>
+
+      <CreateProcessModal 
+        isOpen={isCreateModalOpen}
+        onClose={handleCreateModalClose}
+        onContinue={handleCreateModalContinue}
+      />
     </div>
   );
 }

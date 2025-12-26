@@ -1,0 +1,203 @@
+{
+  "_id": {
+    "$oid": "694e48efad143ee3806ced3a"
+  },
+  "name": "customer support",
+  "xml": "<mxfile host=\"localhost\" agent=\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0\" version=\"29.2.9\"><diagram name=\"Page-1\" id=\"Page-1\">7Zvrc6I6FMD/mszc++E6kADiR5G1j+m2XW1v2/1GISIrECbEV//6OwHCS7HW1trdi+M45CQ5kJzzy+MQARoEqzNqRdPvxME+gJKzAsgEEMoy1ACEXLJOJZqupwKXek5WqBCMvRecCaVMOvccHFcKMkJ85kVVoU3CENusIrMoJctqsQnxq3eNLBdvCMa25W9KHzyHTVOprkqF/Bx77lTcWZaynMAShTNBPLUcsiyJ0DeABpQQll4FqwH2eeeJfknrDRty8wejOGRbKtzHmN48/+J9AiXfesZ+WghAzWcAGY63AFBz+aUQRUIwwjb2FhhAaTCPGQkw5ZckiHzLC5koDuAwqqsAcFhRnNjLcjMjGJY9cymZh06aI9oC8+7Im1luV9bUmK2FVRaYMs+2/L7vuSFAZuA5Ds8zrExg45BhCpBBFphO/KTfl6n9jEXsrC5MgEwZIGPi+f6A+IQmitEk+QBkuNRyPBwykReSkOuPp1bEnyFmOLQ9/6/wp3Flkr5rfhvdSi9ofLH+hZfS+H7kjk0Ajat5b/b9J3m8mi6vezcAGmw+6/v0Orp05fGLea78eABweD9yr5/cn3ezX33lfra8vHfPHkMXQEMzH+WXq0lA1oHzSOTuaqq+BKNL7YcCjYfBxIbkcuL0KYDG0wJAo3/bGzx3by7ROYBDeHkmn1+fvQA41JWZfze9/XdgA2T+zVvBKJnhUrOl5MNdgHghS6ylGkA1pI4K4EAGcCAB1QRwAFQjSSXyQibSFVlzuUKqmgAZiXcWvlHr8kSGuafwB5yywM9Mt5x6DI8jy+YGWVIryj2OuwdelZwn860zTALM6BpAaVqCVskcbFkALqswlQktSi9NZ8OYnkFtZZ7t5poLAgEcZu4skiUm383ohYND5k14W26okxA6whNMcWjjjycUnYZQpSW0JfQwQmVNPjmi4QLHzHMtxqfSizieH4FM5TRkwhbNFs0D0czrnBJNj3kplyMc+ZaNA44MHI7wJEHsozFVT4Sp2mLaYnoYpgieHNOBT2LO6J1nz/ARNp7aaahEUktlS+VhVCrSyakU+83h3OdOnM6cH41m90Roai2aLZr7oYk0/XO3nFVyBmnIm9AqOPomONjZCHJvkkTm1MaleGwVrjxmyvd9XN84yxQMMIuyPg+4FzIcOkLy7BN7JoplUX41LVJKNbtgHFm2F7p3JMpMngkMwhgJqrIrPGFVySgzKxc1DhMlJ2rwvfJQUHVAvPLYI7/uqJKmdvWe0kWarkA5y3viijsSVFCv+MnyzFVJibkuJW4x9QKcjFmpLGR03XgbnvlULlkoTlLrcqquWvgWdTHbjPiVEKHYtxh/N1B50bLF37OqtyR5Y5DPZrBag0wmMV/YFXz0KbXWpRLZ4NOoEYo3TAJCRe5IavXVyWaVjphFG2sBOEwfpaA274bPAbn3fpBRM8io24LcDLLckRpBljqK3tWl4kd9B8kVcrcqfj/K3aOg/I/80SgjmEOYc6nLO1HeWkXq9HpfC2VZOi7LsGX5wEn5a0/CylHIfc8kXFnGfjZF8vspUnZQhFqK/kiK1CPNf+jYa1kk7bGWVcVs11zrC0yAW474vBVddQe67a70/7Er1f6kCVHqA35mT3y3HfJLHK0RjoKEbWGvkuuICCVN7iwCYpY/x/tHfa+Jg+W3xnm3Bd1qzd781oybR9u2H8EqB+jEWctyIE/bdVRLyuy345lqdtzPaDtGtE83GvxCRkPSV7WaWlit0sc1m33+JFPyiDw6UYlGvBJ+aAg1vBZbSFt+YOS4PGTnY9gBXvSWcf1V3eIOO1dle2opnra+HtNrx9DEQfbXXXYv/ah+zO0w/dU14R5m2ZjePpo9+JuwV/C2x86ntDR6y2LoMPZKi4U6f4eO4r8ffwqsHwP9WP7q+vNlyG/AX61KnkzKF39ESW9V/J0HffsP</diagram></mxfile>",
+  "sourceFileName": "customer support.vsdx",
+  "parsedData": {
+    "diagramId": "Page-1",
+    "nodes": [
+      {
+        "id": "2",
+        "label": "<p>Receive Customer Complaint</p>",
+        "shape": "rectangle",
+        "x": 149,
+        "y": 80,
+        "owner": "",
+        "subprocesses": [
+          {
+            "name": "Node1",
+            "shape": "rectangle",
+            "parent": "main",
+            "_id": {
+              "$oid": "694e4904ad143ee3806ced79"
+            }
+          },
+          {
+            "name": "Node2",
+            "shape": "rectangle",
+            "parent": "subprocess-0",
+            "_id": {
+              "$oid": "694e49d4ad143ee3806ceddd"
+            }
+          }
+        ],
+        "_id": {
+          "$oid": "694e48efad143ee3806ced3b"
+        }
+      },
+      {
+        "id": "3",
+        "label": "<p>Identify Order Reference</p>",
+        "shape": "rectangle",
+        "x": 149,
+        "y": 161,
+        "owner": "",
+        "subprocesses": [],
+        "_id": {
+          "$oid": "694e48efad143ee3806ced3c"
+        }
+      },
+      {
+        "id": "4",
+        "label": "<p>Investigate Issue</p>",
+        "shape": "rectangle",
+        "x": 149,
+        "y": 241,
+        "owner": "",
+        "subprocesses": [],
+        "_id": {
+          "$oid": "694e48efad143ee3806ced3d"
+        }
+      },
+      {
+        "id": "5",
+        "label": "<p>Initiate Replacement/Refund</p>",
+        "shape": "rectangle",
+        "x": 149,
+        "y": 321,
+        "owner": "",
+        "subprocesses": [],
+        "_id": {
+          "$oid": "694e48efad143ee3806ced3e"
+        }
+      },
+      {
+        "id": "6",
+        "label": "<p>Close Ticket</p>",
+        "shape": "rectangle",
+        "x": 149,
+        "y": 401,
+        "owner": "",
+        "subprocesses": [],
+        "_id": {
+          "$oid": "694e48efad143ee3806ced3f"
+        }
+      },
+      {
+        "id": "7",
+        "label": "<p>Order Fulfillment</p>",
+        "shape": "rectangle",
+        "x": 368,
+        "y": 161,
+        "owner": "",
+        "subprocesses": [],
+        "_id": {
+          "$oid": "694e48efad143ee3806ced40"
+        }
+      }
+    ],
+    "connections": [
+      {
+        "from": "2",
+        "to": "10000",
+        "style": "edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;",
+        "id": "50000",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e4904ad143ee3806ced7f"
+        }
+      },
+      {
+        "from": "10000",
+        "to": "10001",
+        "style": "edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;",
+        "id": "50002",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e49d4ad143ee3806cede4"
+        }
+      },
+      {
+        "from": "2",
+        "to": "3",
+        "style": "vsdxID=14;edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;spacingTop=0;spacingBottom=0;spacingLeft=0;spacingRight=0;verticalAlign=middle;html=1;labelBackgroundColor=#ffffff;rounded=0;exitX=0.506578947368421;exitY=1.024390243902439;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.506578947368421;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;",
+        "id": "8",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e48efad143ee3806ced41"
+        }
+      },
+      {
+        "from": "3",
+        "to": "7",
+        "style": "vsdxID=37;edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;spacingTop=0;spacingBottom=0;spacingLeft=0;spacingRight=0;verticalAlign=middle;html=1;labelBackgroundColor=#ffffff;rounded=0;exitX=1.006578947368421;exitY=0.4878048780487805;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.4878048780487805;entryDx=0;entryDy=0;entryPerimeter=0;",
+        "id": "9",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e48efad143ee3806ced42"
+        }
+      },
+      {
+        "from": "3",
+        "to": "4",
+        "style": "vsdxID=32;edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;spacingTop=0;spacingBottom=0;spacingLeft=0;spacingRight=0;verticalAlign=middle;html=1;labelBackgroundColor=#ffffff;rounded=0;exitX=0.506578947368421;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.506578947368421;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;",
+        "id": "10",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e48efad143ee3806ced43"
+        }
+      },
+      {
+        "from": "4",
+        "to": "5",
+        "style": "vsdxID=33;edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;spacingTop=0;spacingBottom=0;spacingLeft=0;spacingRight=0;verticalAlign=middle;html=1;labelBackgroundColor=#ffffff;rounded=0;exitX=0.506578947368421;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.506578947368421;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;",
+        "id": "11",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e48efad143ee3806ced44"
+        }
+      },
+      {
+        "from": "5",
+        "to": "6",
+        "style": "vsdxID=34;edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;spacingTop=0;spacingBottom=0;spacingLeft=0;spacingRight=0;verticalAlign=middle;html=1;labelBackgroundColor=#ffffff;rounded=0;exitX=0.506578947368421;exitY=1.024390243902439;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.506578947368421;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;",
+        "id": "12",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e48efad143ee3806ced45"
+        }
+      }
+    ]
+  },
+  "createdAt": {
+    "$date": "2025-12-26T08:35:59.863Z"
+  },
+  "updatedAt": {
+    "$date": "2025-12-26T08:39:48.816Z"
+  },
+  "__v": 2,
+  "processOwner": "Manish Soni"
+}

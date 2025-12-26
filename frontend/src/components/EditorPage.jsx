@@ -28,9 +28,13 @@ function EditorPage() {
   const [isNewFileUpload, setIsNewFileUpload] = useState(false); // Track if current diagram is from file upload
   const [currentView, setCurrentView] = useState('diagram'); // 'diagram' or 'form'
   const [pendingHeaderFile, setPendingHeaderFile] = useState(null); // Store file from header until editor is ready
+  const [pendingProcessName, setPendingProcessName] = useState(null); // Store process name from Create Process modal
+  const [pendingProcessOwner, setPendingProcessOwner] = useState(null); // Store process owner from Create Process modal
+  const [isNewProcess, setIsNewProcess] = useState(false); // Track if this is a new process from Create Process modal
   
   const formViewRef = useRef(null); // Ref for FormView to access save method
   const fileUploadRef = useRef(null); // Ref for FileUpload to trigger upload programmatically
+  const processedFileRef = useRef(null); // Track processed files to prevent re-processing
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -63,16 +67,48 @@ function EditorPage() {
     loadProcessList();
   }, []);
 
-  // Store file from header navigation
+  // Store file or empty diagram from header navigation (Upload Diagram or Create Process)
   useEffect(() => {
-    if (location.state?.uploadedFile && !pendingHeaderFile) {
-      console.log('Received file from header:', location.state.uploadedFile.name);
-      setPendingHeaderFile(location.state.uploadedFile);
+    const uploadedFile = location.state?.uploadedFile;
+    const emptyDiagram = location.state?.emptyDiagram;
+    const processName = location.state?.processName;
+    const processOwner = location.state?.processOwner;
+    const isNew = location.state?.isNewProcess;
+    
+    // Handle file upload from Upload Diagram or Create Process with file
+    if (uploadedFile && uploadedFile !== processedFileRef.current && !pendingHeaderFile) {
+      console.log('Received file from header:', uploadedFile.name);
+      setPendingHeaderFile(uploadedFile);
+      processedFileRef.current = uploadedFile;
+      
+      // Store metadata if provided
+      if (processName) setPendingProcessName(processName);
+      if (processOwner) setPendingProcessOwner(processOwner);
       
       // Clear the state to prevent re-processing on page refresh
-      navigate(location.pathname + location.search, { replace: true, state: {} });
+      setTimeout(() => {
+        navigate(location.pathname + location.search, { replace: true, state: {} });
+      }, 0);
     }
-  }, [location.state, pendingHeaderFile, navigate, location.pathname, location.search]);
+    // Handle empty diagram from Create Process without file
+    else if (emptyDiagram && isNew) {
+      console.log('Received empty diagram for new process:', processName);
+      setPendingProcessName(processName);
+      setPendingProcessOwner(processOwner);
+      setIsNewProcess(true);
+      setIsNewFileUpload(true);
+      setLastSavedId(null);
+      setActiveProcessId(null);
+      
+      // Set the empty diagram XML immediately
+      setDiagramXml(emptyDiagram);
+      
+      // Clear the state to prevent re-processing on page refresh
+      setTimeout(() => {
+        navigate(location.pathname + location.search, { replace: true, state: {} });
+      }, 0);
+    }
+  }, [location.state]);
 
   // Process pending file once editor is ready
   useEffect(() => {
@@ -314,19 +350,30 @@ function EditorPage() {
     const isNewFile = isNewFileUpload || !lastSavedId;
     
     let name;
+    let processOwner = null;
     
     // If saving an existing file, use the existing name without prompting
     if (!isNewFile && lastSavedId) {
       const existingProcess = processList.find(p => p.id === lastSavedId);
       name = existingProcess?.name || `Diagram ${new Date().toLocaleString()}`;
+      processOwner = existingProcess?.processOwner || null;
     } else {
-      // For new files, ask user for a human-friendly name
-      const defaultName = pendingFile?.fileName?.replace(/\.[^/.]+$/, '') || `Diagram ${new Date().toLocaleString()}`;
-      name = window.prompt('Enter a name for this new diagram:', defaultName);
+      // For new files, check if we have pendingProcessName (from Create Process modal)
+      if (pendingProcessName) {
+        name = pendingProcessName;
+        processOwner = pendingProcessOwner;
+        // Clear pending data after use
+        setPendingProcessName(null);
+        setPendingProcessOwner(null);
+      } else {
+        // Otherwise, ask user for a human-friendly name
+        const defaultName = pendingFile?.fileName?.replace(/\.[^/.]+$/, '') || `Diagram ${new Date().toLocaleString()}`;
+        name = window.prompt('Enter a name for this new diagram:', defaultName);
 
-      if (!name) {
-        setIsSaving(false);
-        return;
+        if (!name) {
+          setIsSaving(false);
+          return;
+        }
       }
     }
 
@@ -375,6 +422,7 @@ function EditorPage() {
           xml,
           sourceFileName: sourceFileName || undefined,
           diagramId: diagramId || undefined,
+          processOwner: processOwner || undefined,
         }),
       });
 

@@ -237,7 +237,7 @@ app.put('/api/diagrams/:id', async (req, res) => {
  * Creates a new diagram entry in MongoDB.
  * Parses the XML and stores both raw XML and parsed structure.
  *
- * Body: { name: string, xml: string, sourceFileName?: string, diagramId?: string }
+ * Body: { name: string, xml: string, sourceFileName?: string, diagramId?: string, processOwner?: string }
  */
 app.post('/api/diagrams', async (req, res) => {
   try {
@@ -248,7 +248,7 @@ app.post('/api/diagrams', async (req, res) => {
       });
     }
 
-    const { name, xml, sourceFileName, diagramId } = req.body || {};
+    const { name, xml, sourceFileName, diagramId, processOwner } = req.body || {};
 
     if (!name || !xml) {
       return res.status(400).json({
@@ -333,6 +333,7 @@ app.post('/api/diagrams', async (req, res) => {
       name,
       xml,
       sourceFileName: sourceFileName || undefined,
+      processOwner: processOwner || undefined,
       parsedData: parsedData || undefined,
     });
 

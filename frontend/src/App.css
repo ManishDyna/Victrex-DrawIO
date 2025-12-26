@@ -131,6 +131,20 @@ body {
   color: var(--victrex-white);
 }
 
+.nav-link-create {
+  background: var(--success);
+  color: var(--victrex-white);
+  border-color: var(--success);
+  font-weight: 600;
+}
+
+.nav-link-create:hover {
+  background: #0E9B6E;
+  border-color: #0E9B6E;
+  color: var(--victrex-white);
+  box-shadow: 0 6px 12px rgba(16, 185, 129, 0.15);
+}
+
 .nav-link-upload {
   background: var(--primary);
   color: var(--victrex-white);

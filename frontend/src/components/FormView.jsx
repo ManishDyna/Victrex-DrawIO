@@ -247,6 +247,75 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
     });
   };
 
+  // Add new main step (node)
+  const handleAddStep = () => {
+    console.log('➕ handleAddStep called');
+    
+    // Generate unique ID for the new step
+    const newNodeId = `node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Determine position for the new step
+    // Place it after the last existing node
+    const lastNode = nodes[nodes.length - 1];
+    const x = lastNode ? lastNode.x : 100;
+    const y = lastNode ? lastNode.y + 120 : 100; // 120px below the last node
+    
+    const newNode = {
+      id: newNodeId,
+      label: '',
+      editedLabel: '',
+      shape: 'rectangle',
+      x,
+      y,
+      owner: '',
+      subprocesses: [],
+      isNew: true // Mark as newly created in form view
+    };
+    
+    console.log('✅ Adding new step:', newNode);
+    
+    setNodes(prevNodes => [...prevNodes, newNode]);
+    
+    // Auto-expand the new node
+    setExpandedNodes(prev => new Set([...prev, newNodeId]));
+    
+    // Add connection from last node to new node if there are existing nodes
+    if (lastNode) {
+      const newConnection = {
+        from: lastNode.id,
+        to: newNodeId
+      };
+      setConnections(prevConnections => [...prevConnections, newConnection]);
+      console.log('✅ Added connection from last node to new node:', newConnection);
+    }
+  };
+  
+  // Remove step (node)
+  const handleRemoveStep = (nodeId) => {
+    if (!confirm('Are you sure you want to remove this step? This action cannot be undone.')) {
+      return;
+    }
+    
+    console.log(`🗑️ handleRemoveStep called for node: ${nodeId}`);
+    
+    // Remove the node
+    setNodes(prevNodes => prevNodes.filter(node => node.id !== nodeId));
+    
+    // Remove connections related to this node
+    setConnections(prevConnections => 
+      prevConnections.filter(conn => conn.from !== nodeId && conn.to !== nodeId)
+    );
+    
+    // Remove from expanded nodes
+    setExpandedNodes(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(nodeId);
+      return newSet;
+    });
+    
+    console.log('✅ Step removed');
+  };
+
   // Add new subprocess
   const handleAddSubprocess = (nodeId) => {
     console.log(`➕ handleAddSubprocess called for node: ${nodeId}`);
@@ -378,65 +447,133 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
       console.log('   Current nodes state:', nodes.map(n => ({
         id: n.id,
         label: n.editedLabel,
+        isNew: n.isNew,
         userSubprocesses: n.subprocesses
       })));
       
+      // Check if any nodes are newly created in form view
+      const hasNewNodes = nodes.some(n => n.isNew);
+      
       // Update parsedData with edited nodes
-      const updatedNodes = nodes.map((node, nodeIndex) => ({
-        ...node,
-        label: textToHtml(node.editedLabel), // Convert back to HTML format
-        editedLabel: node.editedLabel, // Keep editedLabel for XML update
-        subprocesses: (node.subprocesses || []).map((sub, subIndex) => {
-          const subObj = typeof sub === 'string' 
-            ? { name: sub, shape: 'rectangle' } 
-            : sub;
-          // Ensure parent is set (default if missing)
-          if (!subObj.parent) {
-            subObj.parent = subIndex === 0 ? 'main' : `subprocess-${subIndex - 1}`;
-          }
-          // Remove internal tracking fields before saving
-          const cleanedSub = { ...subObj };
-          delete cleanedSub.isDetected; // Don't save this flag
-          delete cleanedSub.id; // Don't save internal ID
-          return cleanedSub;
-        }),
-      }));
+      const updatedNodes = nodes.map((node, nodeIndex) => {
+        const cleanedNode = {
+          ...node,
+          label: textToHtml(node.editedLabel) || node.editedLabel, // Convert back to HTML format
+          editedLabel: undefined, // Remove editedLabel for backend
+          isNew: undefined, // Remove isNew flag
+          branchNodes: undefined, // Remove branchNodes
+          subprocesses: (node.subprocesses || []).map((sub, subIndex) => {
+            const subObj = typeof sub === 'string' 
+              ? { name: sub, shape: 'rectangle' } 
+              : sub;
+            // Ensure parent is set (default if missing)
+            if (!subObj.parent) {
+              subObj.parent = subIndex === 0 ? 'main' : `subprocess-${subIndex - 1}`;
+            }
+            // Remove internal tracking fields before saving
+            const cleanedSub = { ...subObj };
+            delete cleanedSub.isDetected; // Don't save this flag
+            delete cleanedSub.id; // Don't save internal ID
+            return cleanedSub;
+          }),
+        };
+        // Remove undefined fields
+        Object.keys(cleanedNode).forEach(key => 
+          cleanedNode[key] === undefined && delete cleanedNode[key]
+        );
+        return cleanedNode;
+      });
       
       console.log('   Sending updated nodes to backend:', updatedNodes.map(n => ({
         id: n.id,
-        label: n.editedLabel,
-        subprocessCount: n.subprocesses?.length || 0,
-        subprocesses: n.subprocesses
+        label: n.label,
+        subprocessCount: n.subprocesses?.length || 0
       })));
 
       // Use latest connections from database to preserve Editor changes
       const latestConnections = latestDiagram.parsedData?.connections || connections;
-
-      const response = await fetch(`http://localhost:3001/api/diagrams/${id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          processOwner,
-          parsedData: {
-            ...latestDiagram.parsedData, // Use latest parsedData as base
-            nodes: updatedNodes, // Override with FormView edits
-            connections: latestConnections, // Use latest connections
+      
+      let response;
+      
+      if (hasNewNodes) {
+        // If there are new nodes, use the rebuild endpoint to regenerate XML
+        console.log('   ⚠️ New nodes detected, using rebuild endpoint');
+        response = await fetch(`http://localhost:3001/api/diagrams/${id}/rebuild`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
           },
-        }),
-      });
+          body: JSON.stringify({
+            nodes: updatedNodes,
+            connections: latestConnections,
+            diagramId: latestDiagram.parsedData?.diagramId,
+          }),
+        });
+      } else {
+        // Otherwise, use normal PATCH to update existing nodes
+        response = await fetch(`http://localhost:3001/api/diagrams/${id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            processOwner,
+            parsedData: {
+              ...latestDiagram.parsedData, // Use latest parsedData as base
+              nodes: updatedNodes, // Override with FormView edits
+              connections: latestConnections, // Use latest connections
+            },
+          }),
+        });
+      }
 
       if (!response.ok) {
         throw new Error('Failed to save changes');
       }
 
       const updated = await response.json();
-      setDiagram(updated);
       
-      // Notify parent component that save is complete (for syncing diagram)
-      if (onSaveComplete) {
-        onSaveComplete(updated);
+      // Reload the diagram to get fresh data after save
+      const reloadResponse = await fetch(`http://localhost:3001/api/diagrams/${id}`);
+      if (reloadResponse.ok) {
+        const reloadedDiagram = await reloadResponse.json();
+        setDiagram(reloadedDiagram);
+        
+        // Update nodes state with fresh data (removing isNew flags)
+        if (reloadedDiagram.parsedData?.nodes) {
+          const refreshedNodes = reloadedDiagram.parsedData.nodes.map((node, nodeIndex) => {
+            const processedSubprocesses = (node.subprocesses || []).map((sub, subIndex) => {
+              const subObj = typeof sub === 'string' 
+                ? { name: sub, shape: 'rectangle' } 
+                : sub;
+              if (!subObj.parent) {
+                subObj.parent = subIndex === 0 ? 'main' : `subprocess-${subIndex - 1}`;
+              }
+              if (!subObj.id && !subObj.branchId) {
+                subObj.id = `reload-${nodeIndex}-${subIndex}-${Date.now()}`;
+              }
+              return subObj;
+            });
+            return {
+              ...node,
+              editedLabel: extractTextFromHtml(node.label || ''),
+              owner: node.owner || '',
+              subprocesses: processedSubprocesses,
+              isNew: false, // Clear isNew flag
+            };
+          });
+          setNodes(refreshedNodes);
+        }
+        
+        // Notify parent component that save is complete (for syncing diagram)
+        if (onSaveComplete) {
+          onSaveComplete(reloadedDiagram);
+        }
+      } else {
+        setDiagram(updated);
+        if (onSaveComplete) {
+          onSaveComplete(updated);
+        }
       }
       
       // Show success message with connection info
@@ -447,14 +584,17 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
       console.log('✅ Save complete:', {
         subprocessCount,
         connectionCount,
-        nodesUpdated: updated.parsedData?.nodes?.length || 0
+        nodesUpdated: updated.parsedData?.nodes?.length || 0,
+        hadNewNodes: hasNewNodes
       });
       
       if (embedded) {
         // In embedded mode, show simpler message
         alert(`Form changes saved! The diagram will reload with your changes.`);
+      } else if (hasNewNodes) {
+        alert(`New steps created successfully!\n\n${updatedNodes.length} total step(s).\n${connectionCount} connection(s).\n\nThe diagram has been regenerated with your new steps.`);
       } else if (subprocessCount > 0) {
-        alert(`Changes saved successfully!\n\n${subprocessCount} subprocess(es) saved.\n${connectionCount} total connection(s) in diagram.\n\nNote: Please reload the diagram in the editor to see the changes.`);
+        alert(`Changes saved successfully!\n\n${subprocessCount} subprocess(es) saved.\n${connectionCount} total connection(s) in diagram.`);
       } else {
         alert('Changes saved successfully!');
       }
@@ -951,27 +1091,48 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
         <div className="form-section">
           <div className="form-section-header">
             <h3>Process Steps</h3>
-            {nodesWithBranches.length > 0 && (
-              <div className="expand-controls">
-                <button
-                  type="button"
-                  className="btn-expand-all"
-                  onClick={expandAll}
-                >
-                  Expand All
-                </button>
-                <button
-                  type="button"
-                  className="btn-collapse-all"
-                  onClick={collapseAll}
-                >
-                  Collapse All
-                </button>
-              </div>
-            )}
+            <div className="step-controls">
+              <button
+                type="button"
+                className="btn-add-step"
+                onClick={handleAddStep}
+                title="Add a new process step"
+              >
+                <i className="fa fa-plus-circle"></i>
+                <span>Add Step</span>
+              </button>
+              {nodesWithBranches.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    className="btn-expand-all"
+                    onClick={expandAll}
+                  >
+                    Expand All
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-collapse-all"
+                    onClick={collapseAll}
+                  >
+                    Collapse All
+                  </button>
+                </>
+              )}
+            </div>
           </div>
           {nodesWithBranches.length === 0 ? (
-            <p className="form-empty">No process steps found in this diagram.</p>
+            <div className="form-empty">
+              <p>No process steps found in this diagram.</p>
+              <button
+                type="button"
+                className="btn-add-first-step"
+                onClick={handleAddStep}
+              >
+                <i className="fa fa-plus-circle"></i>
+                <span>Add Your First Step</span>
+              </button>
+            </div>
           ) : (
             <div className="nodes-list">
               {nodesWithBranches.map((node, index) => {
@@ -979,25 +1140,38 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
                 const isExpanded = expandedNodes.has(node.id);
                 return (
                   <div key={node.id} className="node-card">
-                    <div 
-                      className="node-header-collapsible"
-                      onClick={() => toggleNodeExpansion(node.id)}
-                    >
-                      <div className="node-header-left">
-                        <span className="node-number">Step {index + 1}</span>
-                        <span className="node-shape-badge">{node.shape}</span>
-                        <span className="node-label-preview">
-                          {node.editedLabel || 'No content'}
-                        </span>
+                    <div className="node-card-header-row">
+                      <div 
+                        className="node-header-collapsible"
+                        onClick={() => toggleNodeExpansion(node.id)}
+                      >
+                        <div className="node-header-left">
+                          <span className="node-number">Step {index + 1}</span>
+                          <span className="node-shape-badge">{node.shape}</span>
+                          <span className="node-label-preview">
+                            {node.editedLabel || 'No content'}
+                          </span>
+                        </div>
+                        <div className="node-header-right">
+                          {node.owner && (
+                            <span className="node-owner-badge">Owner: {node.owner}</span>
+                          )}
+                          <span className="node-expand-icon">
+                            {isExpanded ? '▼' : '▶'}
+                          </span>
+                        </div>
                       </div>
-                      <div className="node-header-right">
-                        {node.owner && (
-                          <span className="node-owner-badge">Owner: {node.owner}</span>
-                        )}
-                        <span className="node-expand-icon">
-                          {isExpanded ? '▼' : '▶'}
-                        </span>
-                      </div>
+                      <button
+                        type="button"
+                        className="btn-remove-step"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveStep(node.id);
+                        }}
+                        title="Remove this step"
+                      >
+                        <i className="fa fa-trash-alt"></i>
+                      </button>
                     </div>
 
                     {isExpanded && (
