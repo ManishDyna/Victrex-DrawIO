@@ -1,0 +1,153 @@
+{
+  "_id": {
+    "$oid": "694e2ec1aba0406682381da1"
+  },
+  "name": "customer support",
+  "xml": "<mxfile host=\"localhost\" agent=\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0\" version=\"29.2.9\"><diagram name=\"Page-1\" id=\"Page-1\">7VvZcuI4FP0aqmYeoLyyPILJRqWTNCST5c3YslEjWx5ZhOXr+8qWFwLuScIkpLqdohL76OpaujrnWAHT0K1gdcbsaPaNuog0NMVdNfRhQ9NU1WjDH4GsU6TdVVPAZ9iVQQUwwRskQUWiC+yieCuQU0o4jrZBh4YhcvgWZjNGl9thHiXbV41sH+0AE8cmu+g9dvksRbumUuDnCPuz7MqqIlsCOwuWQDyzXbosQfpJQ7cYpTw9ClYWIqJ4WV3SfqcVrfnAGAr5ng53MWLX0x+iJppC7CmsSxLU0NoE4gcufhaD4ms50/a/CzGSgUdD3oyTdehDgBqtijY48uXfJEe0NwNHK960CfZDSOHA6BADNLCZj8MmQR7E9JUCYWn1yhCnkQDg0jk0pZzTIEeTa+DQTeaedH1GjGNYt/zKAXZdMTKYKYMqYCpAwlk6/ooZidn/Z1lUo6WqyTAS1LMDTIDefQsuPWUYcIcSypIC6krys3cYBHGoTTOObAeHfj43gkPUnElS9VWxrCbAVIRxcR11d/xj5CD8jGDo1iKGQkHJ4ZAGEbGxmFE6uykT9HgxZYDSWe/A0R4soU2GJmq0fSmxge3MfUYXoZu2ZEzVcrLnJC6zVhK5KLmWLWU/XclhvpJyaYc5qSiEeiRR1TJV5+A5dlcXQwBUsT6YECtdC0ise8kP4D6zXQxJsraQhiI/SDQSY4g5Ch1M/gqfBpdD2veHJ+MbZaNPLtY/0FKZ3I39CaQbXC56829P9OFytrzqXQPAF/M+YVfRyFcnm+G58f0eKgbRV4/+0+38R9+4my9Hd/7ZA6y2NmgPH9TNpRfQdeA+ULWzmpmbYDxqfze0wb3lORodeW4flmzwCDUf9G961rRzPdLPIak2OlPPr842cNg15uR2dvOP5cDI/xaz4IzOUWnaOQUjCmRIVsscwEtpmQ3NgvpbSsOEQAuw5CzBCyw738Kq4woUXkBn4T0FN16UPMGQYIoY4IwHRC7dcoY5mgDnxYIs4eaSM07QA61K5JHcOkPAe87WEDIrWbIhCbYs7Fs1tRTLshi99FzepLrSsm3JbD/PXPgrHEg6Z6clx60d+I9z4AtRCewJ9l0zN/HfMfIQ+Bww+Kj+qx/Hf43af2v/fZ//qm21NuDagN9owOEzijn2bS62wRdxvDiy7xrH8V2tNt7aeN9pvHmf2nhr43298WKOU9cdo4gAcQNRGu0U9r+JKR7ThM0jmbBZm3Btwu8zYV2rTbg24TeasEVoLBz4FjtzdOQ3fNvH8VxdqT239tz3ea6h1J5be+4bPTd7n/d0QYTtpLveYxpv50jG266Ntzbe1xmv3u5+7lu928qx0sdEoCxbwunuCge5Ow+G7CqJLpgjo7RdceWfRIt35ES+iWzMNMBtxvviIZUCQ6GbIVNCnXkWJp+MMdOQ0lk1BaXF3QpfH5aAgXT1MnaZ3CHKyFgua9nmd2yiRKIK7pWtYJuAaIX5gzhumUrb7HR7RgfIYWiqbHsUiVuKZui94pdsG65KSYbr0skNYhj4IzwrxULgUuVlRONjObJInJyty2cvU2fcYj6StND3S4QhYnPxdEaZO/v4Lrve0OSZjXyvom33oJ4Xiy1+oQ9gjL0uRUjzqcwot+iFCA0otFnOuK9LK9sjVfaCg3QohWrzMnyOkHuHC1mvFrLeqYVcLWRgQ6WQlZbR7XSV4pd5gJK3lLs38eFSLm+l/j8pN1/0OFzKupaLMNelfMSySsp7uyitXu9rSVlVGh+qZa3W8jtvyl/7Jlz+2PVr3IS3trGfrSL1cBUZv1CRXqvot1SR+SEqaqr6R+9ldeUVe1kzu9tV9/oCN0DtcOmav5Bu/V/pn/FfafnjmN/ghghQ8aWZNEPx1SP95Cc=</diagram></mxfile>",
+  "sourceFileName": "customer support.vsdx",
+  "parsedData": {
+    "diagramId": "Page-1",
+    "nodes": [
+      {
+        "id": "2",
+        "label": "<div style=\"font-size: 1px\"><p style=\"text-align:center;margin-left:0;margin-right:0;margin-top:0px;margin-bottom:0px;text-indent:0;vertical-align:middle;direction:ltr;\"><font style=\"font-size:14.11px;font-family:Calibri;color:#000000;direction:ltr;letter-spacing:0px;line-height:120%;opacity:1\">Receive Customer Complaint<br/></font></p></div>",
+        "shape": "rectangle",
+        "x": 149,
+        "y": 80,
+        "_id": {
+          "$oid": "694e2ec1aba0406682381da2"
+        },
+        "subprocesses": []
+      },
+      {
+        "id": "3",
+        "label": "<div style=\"font-size: 1px\"><p style=\"text-align:center;margin-left:0;margin-right:0;margin-top:0px;margin-bottom:0px;text-indent:0;vertical-align:middle;direction:ltr;\"><font style=\"font-size:14.11px;font-family:Calibri;color:#000000;direction:ltr;letter-spacing:0px;line-height:120%;opacity:1\">Identify Order Reference<br/></font></p></div>",
+        "shape": "rectangle",
+        "x": 149,
+        "y": 161,
+        "_id": {
+          "$oid": "694e2ec1aba0406682381da3"
+        },
+        "subprocesses": []
+      },
+      {
+        "id": "4",
+        "label": "<div style=\"font-size: 1px\"><p style=\"text-align:center;margin-left:0;margin-right:0;margin-top:0px;margin-bottom:0px;text-indent:0;vertical-align:middle;direction:ltr;\"><font style=\"font-size:14.11px;font-family:Calibri;color:#000000;direction:ltr;letter-spacing:0px;line-height:120%;opacity:1\">Investigate Issue<br/></font></p></div>",
+        "shape": "rectangle",
+        "x": 149,
+        "y": 241,
+        "_id": {
+          "$oid": "694e2ec1aba0406682381da4"
+        },
+        "subprocesses": []
+      },
+      {
+        "id": "5",
+        "label": "<div style=\"font-size: 1px\"><p style=\"text-align:center;margin-left:0;margin-right:0;margin-top:0px;margin-bottom:0px;text-indent:0;vertical-align:middle;direction:ltr;\"><font style=\"font-size:14.11px;font-family:Calibri;color:#000000;direction:ltr;letter-spacing:0px;line-height:120%;opacity:1\">Initiate Replacement/Refund<br/></font></p></div>",
+        "shape": "rectangle",
+        "x": 149,
+        "y": 321,
+        "_id": {
+          "$oid": "694e2ec1aba0406682381da5"
+        },
+        "subprocesses": []
+      },
+      {
+        "id": "6",
+        "label": "<div style=\"font-size: 1px\"><p style=\"text-align:center;margin-left:0;margin-right:0;margin-top:0px;margin-bottom:0px;text-indent:0;vertical-align:middle;direction:ltr;\"><font style=\"font-size:14.11px;font-family:Calibri;color:#000000;direction:ltr;letter-spacing:0px;line-height:120%;opacity:1\">Close Ticket<br/></font></p></div>",
+        "shape": "rectangle",
+        "x": 149,
+        "y": 401,
+        "_id": {
+          "$oid": "694e2ec1aba0406682381da6"
+        },
+        "subprocesses": []
+      },
+      {
+        "id": "7",
+        "label": "<div style=\"font-size: 1px\"><p style=\"text-align:center;margin-left:0;margin-right:0;margin-top:0px;margin-bottom:0px;text-indent:0;vertical-align:middle;direction:ltr;\"><font style=\"font-size:14.11px;font-family:Calibri;color:#000000;direction:ltr;letter-spacing:0px;line-height:120%;opacity:1\">Order Fulfillment<br/></font></p></div>",
+        "shape": "rectangle",
+        "x": 368,
+        "y": 161,
+        "_id": {
+          "$oid": "694e2ec1aba0406682381da7"
+        },
+        "subprocesses": []
+      }
+    ],
+    "connections": [
+      {
+        "from": "2",
+        "to": "3",
+        "style": "vsdxID=14;edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;spacingTop=0;spacingBottom=0;spacingLeft=0;spacingRight=0;verticalAlign=middle;html=1;labelBackgroundColor=#ffffff;rounded=0;exitX=0.506578947368421;exitY=1.024390243902439;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.506578947368421;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;",
+        "id": "8",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e2ec1aba0406682381da8"
+        }
+      },
+      {
+        "from": "3",
+        "to": "7",
+        "style": "vsdxID=37;edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;spacingTop=0;spacingBottom=0;spacingLeft=0;spacingRight=0;verticalAlign=middle;html=1;labelBackgroundColor=#ffffff;rounded=0;exitX=1.006578947368421;exitY=0.4878048780487805;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.4878048780487805;entryDx=0;entryDy=0;entryPerimeter=0;",
+        "id": "9",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e2ec1aba0406682381da9"
+        }
+      },
+      {
+        "from": "3",
+        "to": "4",
+        "style": "vsdxID=32;edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;spacingTop=0;spacingBottom=0;spacingLeft=0;spacingRight=0;verticalAlign=middle;html=1;labelBackgroundColor=#ffffff;rounded=0;exitX=0.506578947368421;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.506578947368421;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;",
+        "id": "10",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e2ec1aba0406682381daa"
+        }
+      },
+      {
+        "from": "4",
+        "to": "5",
+        "style": "vsdxID=33;edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;spacingTop=0;spacingBottom=0;spacingLeft=0;spacingRight=0;verticalAlign=middle;html=1;labelBackgroundColor=#ffffff;rounded=0;exitX=0.506578947368421;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.506578947368421;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;",
+        "id": "11",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e2ec1aba0406682381dab"
+        }
+      },
+      {
+        "from": "5",
+        "to": "6",
+        "style": "vsdxID=34;edgeStyle=none;startArrow=none;endArrow=block;startSize=5;endSize=5;strokeColor=#000000;spacingTop=0;spacingBottom=0;spacingLeft=0;spacingRight=0;verticalAlign=middle;html=1;labelBackgroundColor=#ffffff;rounded=0;exitX=0.506578947368421;exitY=1.024390243902439;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.506578947368421;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;",
+        "id": "12",
+        "strokeColor": "#000000",
+        "endArrow": "block",
+        "startArrow": "none",
+        "dashed": false,
+        "_id": {
+          "$oid": "694e2ec1aba0406682381dac"
+        }
+      }
+    ]
+  },
+  "createdAt": {
+    "$date": "2025-12-26T06:44:17.644Z"
+  },
+  "updatedAt": {
+    "$date": "2025-12-26T06:44:17.644Z"
+  },
+  "__v": 0
+}

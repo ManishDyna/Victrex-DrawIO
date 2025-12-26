@@ -12,6 +12,7 @@ const path = require('path');
 const mongoose = require('mongoose');
 const { parseMxGraphXml } = require('./utils/mxGraphParser');
 const { updateDiagramXml } = require('./utils/xmlUpdater');
+const { buildMxGraphXml } = require('./utils/mxGraphBuilder');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -633,6 +634,82 @@ app.patch('/api/diagrams/:id', async (req, res) => {
   } catch (err) {
     console.error('Error updating diagram:', err);
     return res.status(500).json({ error: 'Failed to update diagram.' });
+  }
+});
+
+/**
+ * PUT /api/diagrams/:id/rebuild
+ * Rebuilds the entire XML from parsedData (nodes and connections).
+ * This is useful when you want to completely recreate the diagram from form data.
+ * Uses mxGraphBuilder to generate clean XML from scratch.
+ * 
+ * Body: { nodes: Array, connections: Array, diagramId?: string }
+ * 
+ * This is similar to Jatin's approach - rebuild XML from scratch when form changes.
+ */
+app.put('/api/diagrams/:id/rebuild', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nodes, connections, diagramId } = req.body;
+
+    if (!nodes || !Array.isArray(nodes)) {
+      return res.status(400).json({ error: 'Nodes array is required.' });
+    }
+
+    if (!connections || !Array.isArray(connections)) {
+      return res.status(400).json({ error: 'Connections array is required.' });
+    }
+
+    const doc = await Diagram.findById(id);
+
+    if (!doc) {
+      return res.status(404).json({ error: 'Diagram not found.' });
+    }
+
+    // Use existing diagramId or provided one
+    const finalDiagramId = diagramId || doc.parsedData?.diagramId || 'Page-1';
+
+    console.log(`🔨 Rebuilding XML from parsedData for diagram ${id}...`);
+    console.log(`   - Nodes: ${nodes.length}`);
+    console.log(`   - Connections: ${connections.length}`);
+
+    // Rebuild XML from scratch using mxGraphBuilder
+    try {
+      const rebuiltXml = buildMxGraphXml({
+        diagramId: finalDiagramId,
+        nodes: nodes,
+        connections: connections,
+      });
+
+      // Update both XML and parsedData
+      doc.xml = rebuiltXml;
+      doc.parsedData = {
+        diagramId: finalDiagramId,
+        nodes: nodes,
+        connections: connections,
+      };
+
+      await doc.save();
+
+      console.log(`✅ Successfully rebuilt XML for diagram ${id}`);
+
+      return res.json({
+        id: doc._id,
+        name: doc.name,
+        xml: doc.xml,
+        parsedData: doc.parsedData,
+        updatedAt: doc.updatedAt,
+      });
+    } catch (buildError) {
+      console.error('Failed to rebuild XML:', buildError);
+      return res.status(500).json({ 
+        error: 'Failed to rebuild XML from parsedData',
+        details: buildError.message
+      });
+    }
+  } catch (err) {
+    console.error('Error rebuilding diagram:', err);
+    return res.status(500).json({ error: 'Failed to rebuild diagram.' });
   }
 });
 

@@ -160,6 +160,90 @@ function updateDiagramXml(xml, updatedNodes) {
       }
     });
 
+    // STEP 1: Build a map of ALL subprocess nodes that SHOULD exist (from updatedNodes)
+    const desiredSubprocessesMap = new Map(); // key: parentNodeId, value: array of subprocess objects
+    updatedNodes.forEach(node => {
+      if (node.subprocesses && node.subprocesses.length > 0) {
+        const validSubprocesses = node.subprocesses
+          .map(sub => typeof sub === 'string' ? { name: sub, shape: 'rectangle' } : sub)
+          .filter(sub => sub.name && sub.name.trim());
+        desiredSubprocessesMap.set(String(node.id), validSubprocesses);
+      }
+    });
+    
+    // STEP 2: Find ALL existing subprocess nodes in XML
+    // A subprocess node is one that was created by our previous saves
+    // We identify them by checking if they're connected FROM a main node (source in cellIdMap)
+    const existingSubprocessMap = new Map(); // key: subprocess name (lowercase), value: { id, name, parentNodeId }
+    
+    updatedNodes.forEach(node => {
+      const nodeId = String(node.id);
+      
+      // Find all edges that have this node as source
+      const edgeFromNodePattern = new RegExp(`<mxCell[^>]*edge="1"[^>]*source="${nodeId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*target="([^"]+)"[^>]*>`, 'gi');
+      let edgeMatch;
+      
+      while ((edgeMatch = edgeFromNodePattern.exec(decodedXml)) !== null) {
+        const targetId = edgeMatch[1];
+        
+        // Get the target node's value (name) to identify it as a subprocess
+        const targetNodePattern = new RegExp(`<mxCell[^>]*id="${targetId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*value="([^"]*)"[^>]*vertex="1"`, 'i');
+        const targetNodeMatch = decodedXml.match(targetNodePattern);
+        
+        if (targetNodeMatch && targetNodeMatch[1]) {
+          const valueAttr = targetNodeMatch[1];
+          // Extract text from value (e.g., "&lt;div&gt;&lt;p&gt;Order Fulfillment&lt;/p&gt;&lt;/div&gt;")
+          const textMatch = valueAttr.match(/&lt;p&gt;([^&<]+)&lt;\/p&gt;/);
+          if (textMatch && textMatch[1]) {
+            const subprocessName = textMatch[1].trim();
+            existingSubprocessMap.set(subprocessName.toLowerCase(), {
+              id: targetId,
+              name: subprocessName,
+              parentNodeId: nodeId
+            });
+            console.log(`   📋 Found existing subprocess: "${subprocessName}" (ID: ${targetId}) connected to node ${nodeId}`);
+          }
+        }
+      }
+    });
+    
+    // STEP 3: Remove subprocess nodes that are no longer in the desired list
+    const nodesToRemove = [];
+    existingSubprocessMap.forEach((existingSub, normalizedName) => {
+      const parentNodeId = existingSub.parentNodeId;
+      const desiredSubs = desiredSubprocessesMap.get(parentNodeId) || [];
+      
+      // Check if this subprocess still exists in desired list
+      const stillExists = desiredSubs.some(sub => 
+        sub.name.toLowerCase() === normalizedName
+      );
+      
+      if (!stillExists) {
+        nodesToRemove.push(existingSub);
+        console.log(`   🗑️  Marking subprocess "${existingSub.name}" (ID: ${existingSub.id}) for removal`);
+      }
+    });
+    
+    // Remove marked nodes and their edges from XML
+    nodesToRemove.forEach(sub => {
+      // Remove the node itself
+      const nodePattern = new RegExp(`<mxCell[^>]*id="${sub.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*>[\\s\\S]*?<\\/mxCell>`, 'g');
+      updatedXml = updatedXml.replace(nodePattern, '');
+      console.log(`   ✅ Removed subprocess node "${sub.name}" (ID: ${sub.id}) from XML`);
+      
+      // Remove all edges connected to this node (both incoming and outgoing)
+      const edgeToNodePattern = new RegExp(`<mxCell[^>]*edge="1"[^>]*target="${sub.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*>[\\s\\S]*?<\\/mxCell>`, 'g');
+      updatedXml = updatedXml.replace(edgeToNodePattern, '');
+      
+      const edgeFromNodePattern = new RegExp(`<mxCell[^>]*edge="1"[^>]*source="${sub.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*>[\\s\\S]*?<\\/mxCell>`, 'g');
+      updatedXml = updatedXml.replace(edgeFromNodePattern, '');
+      
+      console.log(`   ✅ Removed edges connected to subprocess "${sub.name}"`);
+      
+      // Remove from existingSubprocessMap so we don't try to update it later
+      existingSubprocessMap.delete(sub.name.toLowerCase());
+    });
+    
     // Add subprocess nodes and their edges as XML strings before </root> tag
     const subprocessNodesXml = [];
     const subprocessEdgesXml = [];
@@ -177,8 +261,9 @@ function updateDiagramXml(xml, updatedNodes) {
     // Use a high starting point to avoid conflicts with draw.io's auto-assigned IDs
     // Draw.io typically uses sequential IDs starting from 0, so we use much higher numbers
     let nextSubprocessId = Math.max(10000, maxId + 1000);
-    // Start edge IDs from maxId + 2000 to ensure they're unique
-    let nextEdgeId = Math.max(20000, maxId + 2000);
+    // Start edge IDs from maxId + 20000 to ensure they're unique and separate from nodes
+    // Use very high number to avoid conflicts with any existing edges
+    let nextEdgeId = Math.max(50000, maxId + 20000);
     
     // CRITICAL: Check if any of our planned IDs conflict with existing IDs
     // If they do, start from a higher number
@@ -192,6 +277,7 @@ function updateDiagramXml(xml, updatedNodes) {
     }
     
     console.log(`   🔢 Max existing ID: ${maxId}, Starting subprocess IDs from: ${nextSubprocessId}, Starting edge IDs from: ${nextEdgeId}`);
+    console.log(`   📊 Existing IDs in XML: ${cellIdMap.size} total`);
     
     updatedNodes.forEach(node => {
       if (!node.subprocesses || node.subprocesses.length === 0) return;
@@ -213,48 +299,32 @@ function updateDiagramXml(xml, updatedNodes) {
         
         if (!subprocessObj.name || !subprocessObj.name.trim()) return;
         
-        // Check if a subprocess node with this name already exists in the XML
-        // This handles cases where draw.io has already created/reassigned the node
-        // We need to check BOTH formats:
-        // 1. UserObject wrapped: <UserObject><mxCell id="X" value="..."></mxCell></UserObject>
-        // 2. Plain mxCell: <mxCell id="X" value="..."></mxCell>
-        const escapedNameForSearch = subprocessObj.name
-          .replace(/&/g, '&amp;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;');
-        
-        // Search for existing node with this name - look for the value attribute containing the name
-        const nameInValue = `&lt;div&gt;&lt;p&gt;${escapedNameForSearch}&lt;/p&gt;&lt;/div&gt;`;
-        const escapedValue = nameInValue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        
-        // Pattern 1: UserObject wrapped node
-        const userObjectPattern = new RegExp(`<UserObject[^>]*>\\s*<mxCell[^>]*id="([^"]+)"[^>]*value="${escapedValue}"[^>]*vertex="1"`, 'i');
-        // Pattern 2: Plain mxCell (not wrapped in UserObject)
-        const plainMxCellPattern = new RegExp(`<mxCell[^>]*id="([^"]+)"[^>]*value="${escapedValue}"[^>]*vertex="1"`, 'i');
-        
-        const userObjectMatch = decodedXml.match(userObjectPattern);
-        const plainCellMatch = decodedXml.match(plainMxCellPattern);
+        const normalizedName = subprocessObj.name.toLowerCase();
+        const existingSub = existingSubprocessMap.get(normalizedName);
         
         let subprocessId;
         let shouldCreateNode = true;
+        let shouldUpdateShape = false;
+        let needsNewEdge = false;
         
-        // Check both patterns - prefer UserObject match first, then plain mxCell
-        if (userObjectMatch && userObjectMatch[1]) {
-          subprocessId = userObjectMatch[1];
+        if (existingSub && existingSub.parentNodeId === String(node.id)) {
+          // Subprocess already exists for this parent node
+          subprocessId = existingSub.id;
           shouldCreateNode = false;
-          console.log(`   🔄 Found existing UserObject-wrapped subprocess node "${subprocessObj.name}" with ID ${subprocessId}, reusing it`);
-        } else if (plainCellMatch && plainCellMatch[1]) {
-          subprocessId = plainCellMatch[1];
-          shouldCreateNode = false;
-          console.log(`   🔄 Found existing plain mxCell subprocess node "${subprocessObj.name}" with ID ${subprocessId}, reusing it`);
+          shouldUpdateShape = true; // Always check if shape needs updating
+          console.log(`   🔄 Found existing subprocess "${subprocessObj.name}" with ID ${subprocessId}`);
+        } else if (existingSub) {
+          // Subprocess exists but for a different parent - create new one
+          subprocessId = nextSubprocessId++;
+          while (cellIdMap.has(String(subprocessId))) {
+            subprocessId = nextSubprocessId++;
+          }
+          console.log(`   ⚠️  Subprocess "${subprocessObj.name}" exists for different parent, creating new one with ID ${subprocessId}`);
         } else {
           // Create new node with unique ID
           subprocessId = nextSubprocessId++;
-          // Ensure ID doesn't conflict
           while (cellIdMap.has(String(subprocessId))) {
             subprocessId = nextSubprocessId++;
-            console.log(`   ⚠️  ID conflict, using ${subprocessId} instead`);
           }
           console.log(`   ✨ Creating new subprocess node "${subprocessObj.name}" with ID ${subprocessId}`);
         }
@@ -263,6 +333,40 @@ function updateDiagramXml(xml, updatedNodes) {
         cellIdMap.set(String(subprocessId), true);
         // Also track in subprocessIdMap for parent lookup
         subprocessIdMap.set(index, subprocessId);
+        
+        // Get shape style
+        const getShapeStyle = (shape) => {
+          const baseStyle = 'whiteSpace=wrap;html=1;';
+          switch (shape) {
+            case 'ellipse':
+              return baseStyle + 'shape=ellipse;';
+            case 'decision':
+              return baseStyle + 'shape=rhombus;';
+            case 'data':
+              return baseStyle + 'shape=parallelogram;';
+            case 'document':
+              return baseStyle + 'shape=document;';
+            case 'subprocess':
+              return baseStyle + 'shape=process;';
+            default:
+              return baseStyle + 'shape=rect;';
+          }
+        };
+        
+        const style = getShapeStyle(subprocessObj.shape || 'rectangle');
+        
+        // Update shape if subprocess exists and shape changed
+        if (shouldUpdateShape && !shouldCreateNode) {
+          const shapeUpdatePattern = new RegExp(
+            `(<mxCell[^>]*id="${subprocessId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*style=")[^"]*("[^>]*>)`,
+            'i'
+          );
+          const shapeMatch = updatedXml.match(shapeUpdatePattern);
+          if (shapeMatch) {
+            updatedXml = updatedXml.replace(shapeUpdatePattern, `$1${style}$2`);
+            console.log(`   ✅ Updated shape for subprocess "${subprocessObj.name}" to ${subprocessObj.shape || 'rectangle'}`);
+          }
+        }
         
         // Calculate initial position for subprocess
         let subprocessX = parentPos.x + parentWidth + spacing;
@@ -317,26 +421,6 @@ function updateDiagramXml(xml, updatedNodes) {
           console.log(`   📍 Adjusted subprocess "${subprocessObj.name}" position to avoid overlap (${attempts} adjustments)`);
         }
         
-        // Get shape style
-        const getShapeStyle = (shape) => {
-          const baseStyle = 'whiteSpace=wrap;html=1;';
-          switch (shape) {
-            case 'ellipse':
-              return baseStyle + 'shape=ellipse;';
-            case 'decision':
-              return baseStyle + 'shape=rhombus;';
-            case 'data':
-              return baseStyle + 'shape=parallelogram;';
-            case 'document':
-              return baseStyle + 'shape=document;';
-            case 'subprocess':
-              return baseStyle + 'shape=process;';
-            default:
-              return baseStyle + 'shape=rect;';
-          }
-        };
-        
-        const style = getShapeStyle(subprocessObj.shape || 'rectangle');
         const escapedName = subprocessObj.name
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
@@ -355,6 +439,21 @@ function updateDiagramXml(xml, updatedNodes) {
           console.log(`   ✅ Created subprocess node: ${subprocessObj.name} (ID: ${subprocessId}) at (${subprocessX}, ${subprocessY})`);
         } else {
           console.log(`   ⏭️  Skipped creating subprocess node "${subprocessObj.name}" - already exists with ID ${subprocessId}`);
+        }
+        
+        // STEP: Remove OLD edges connected to this subprocess (both incoming and outgoing)
+        // This ensures we don't have duplicate edges when parent changes
+        console.log(`   🔗 Checking for existing edges to subprocess ${subprocessId}...`);
+        const oldEdgeToPattern = new RegExp(`<mxCell[^>]*edge="1"[^>]*target="${subprocessId.toString().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*>[\\s\\S]*?<\\/mxCell>`, 'g');
+        let removedEdges = 0;
+        updatedXml = updatedXml.replace(oldEdgeToPattern, (match) => {
+          removedEdges++;
+          console.log(`   🗑️  Removed old edge to subprocess ${subprocessId}`);
+          return '';
+        });
+        
+        if (removedEdges > 0) {
+          console.log(`   ✅ Removed ${removedEdges} old edge(s) to subprocess "${subprocessObj.name}"`);
         }
         
         // IMPORTANT: Get source ID BEFORE checking for existing edges
@@ -495,6 +594,15 @@ function updateDiagramXml(xml, updatedNodes) {
         {
           // Edge style: solid black line with arrow (same as regular connectors)
           const edgeId = nextEdgeId++;
+          
+          // CRITICAL: Add edge ID to cellIdMap immediately to prevent duplicates
+          cellIdMap.set(String(edgeId), true);
+          
+          // Ensure no conflict with next ID
+          while (cellIdMap.has(String(nextEdgeId))) {
+            nextEdgeId++;
+          }
+          
           // Use standard black connector style matching regular diagram connectors
           // Adjust exit/entry points based on parent type
           let exitX, exitY, entryX, entryY;
