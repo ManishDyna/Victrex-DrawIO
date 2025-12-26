@@ -27,6 +27,7 @@ function EditorPage() {
   const [pendingFile, setPendingFile] = useState(null);
   const [isNewFileUpload, setIsNewFileUpload] = useState(false); // Track if current diagram is from file upload
   const [currentView, setCurrentView] = useState('diagram'); // 'diagram' or 'form'
+  const [pendingHeaderFile, setPendingHeaderFile] = useState(null); // Store file from header until editor is ready
   
   const formViewRef = useRef(null); // Ref for FormView to access save method
   const fileUploadRef = useRef(null); // Ref for FileUpload to trigger upload programmatically
@@ -62,23 +63,25 @@ function EditorPage() {
     loadProcessList();
   }, []);
 
-  // Auto-trigger upload when navigating from header with action=upload
+  // Store file from header navigation
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const action = params.get('action');
-    
-    if (action === 'upload' && editorReady && fileUploadRef.current) {
-      // Remove the action parameter from URL to prevent re-triggering
-      params.delete('action');
-      const newSearch = params.toString();
-      navigate(`/editor${newSearch ? '?' + newSearch : ''}`, { replace: true });
+    if (location.state?.uploadedFile && !pendingHeaderFile) {
+      console.log('Received file from header:', location.state.uploadedFile.name);
+      setPendingHeaderFile(location.state.uploadedFile);
       
-      // Trigger the file upload dialog
-      setTimeout(() => {
-        fileUploadRef.current?.triggerUpload();
-      }, 100);
+      // Clear the state to prevent re-processing on page refresh
+      navigate(location.pathname + location.search, { replace: true, state: {} });
     }
-  }, [location.search, editorReady, navigate]);
+  }, [location.state, pendingHeaderFile, navigate, location.pathname, location.search]);
+
+  // Process pending file once editor is ready
+  useEffect(() => {
+    if (pendingHeaderFile && editorReady) {
+      console.log('Editor ready, processing file:', pendingHeaderFile.name);
+      handleFileUpload(pendingHeaderFile);
+      setPendingHeaderFile(null);
+    }
+  }, [pendingHeaderFile, editorReady]);
 
   // If navigated from history with a diagram ID, load it from backend
   useEffect(() => {
@@ -541,6 +544,20 @@ function EditorPage() {
       />
 
       <div className="upload-section">
+        {pendingHeaderFile && !editorReady && (
+          <div className="upload-status">
+            <i className="fa fa-spinner fa-spin"></i>
+            <span>Loading editor and preparing your file...</span>
+          </div>
+        )}
+        
+        {pendingHeaderFile && editorReady && (
+          <div className="upload-status">
+            <i className="fa fa-spinner fa-spin"></i>
+            <span>Processing {pendingHeaderFile.name}...</span>
+          </div>
+        )}
+
         <button
           type="button"
           className="upload-button"
