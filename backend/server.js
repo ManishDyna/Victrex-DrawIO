@@ -640,6 +640,88 @@ app.patch('/api/diagrams/:id', async (req, res) => {
 });
 
 /**
+ * PATCH /api/diagrams/:id/name
+ * Updates only the name of a diagram.
+ * 
+ * Body: { name: string }
+ */
+app.patch('/api/diagrams/:id/name', async (req, res) => {
+  try {
+    // Check if MongoDB is connected
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ 
+        error: 'Database not connected. Please check MongoDB connection.' 
+      });
+    }
+
+    const { id } = req.params;
+    const { name } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Name is required.' });
+    }
+
+    const doc = await Diagram.findById(id);
+
+    if (!doc) {
+      return res.status(404).json({ error: 'Diagram not found.' });
+    }
+
+    // Update name
+    doc.name = name.trim();
+    await doc.save();
+
+    console.log(`✅ Updated diagram name: ${id} -> "${name}"`);
+
+    return res.json({
+      id: doc._id,
+      name: doc.name,
+      updatedAt: doc.updatedAt,
+    });
+  } catch (err) {
+    console.error('Error updating diagram name:', err);
+    return res.status(500).json({ error: 'Failed to update diagram name.' });
+  }
+});
+
+/**
+ * DELETE /api/diagrams/:id
+ * Deletes a diagram from the database.
+ */
+app.delete('/api/diagrams/:id', async (req, res) => {
+  try {
+    // Check if MongoDB is connected
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ 
+        error: 'Database not connected. Please check MongoDB connection.' 
+      });
+    }
+
+    const { id } = req.params;
+
+    const doc = await Diagram.findById(id);
+
+    if (!doc) {
+      return res.status(404).json({ error: 'Diagram not found.' });
+    }
+
+    const diagramName = doc.name;
+    await Diagram.findByIdAndDelete(id);
+
+    console.log(`🗑️ Deleted diagram: ${id} (${diagramName})`);
+
+    return res.json({
+      message: 'Diagram deleted successfully',
+      id: id,
+      name: diagramName,
+    });
+  } catch (err) {
+    console.error('Error deleting diagram:', err);
+    return res.status(500).json({ error: 'Failed to delete diagram.' });
+  }
+});
+
+/**
  * PUT /api/diagrams/:id/rebuild
  * Rebuilds the entire XML from parsedData (nodes and connections).
  * This is useful when you want to completely recreate the diagram from form data.

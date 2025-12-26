@@ -1,5 +1,5 @@
 import './App.css';
-import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
+import { Routes, Route, NavLink, useNavigate, Navigate } from 'react-router-dom';
 import { useRef, useState } from 'react';
 import EditorPage from './components/EditorPage';
 import HistoryPage from './components/HistoryPage';
@@ -136,10 +136,20 @@ function App() {
 
       <main className="app-content">
         <Routes>
+          {/* Default route - Available Processes page */}
           <Route path="/" element={<HistoryPage />} />
+          
+          {/* Editor page */}
           <Route path="/editor" element={<EditorPage />} />
-          <Route path="/history" element={<HistoryPage />} />
+          
+          {/* Form view (standalone) */}
           <Route path="/form/:id" element={<FormView />} />
+          
+          {/* Redirect /history to root (for backward compatibility) */}
+          <Route path="/history" element={<Navigate to="/" replace />} />
+          
+          {/* Catch-all route - redirect unknown paths to home */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
 

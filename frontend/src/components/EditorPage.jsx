@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import DrawIOEditor from './DrawIOEditor';
 import FileUpload from './FileUpload';
 import FormView from './FormView';
+import CreateProcessModal from './CreateProcessModal';
 
 /**
  * EditorPage
@@ -31,6 +32,9 @@ function EditorPage() {
   const [pendingProcessName, setPendingProcessName] = useState(null); // Store process name from Create Process modal
   const [pendingProcessOwner, setPendingProcessOwner] = useState(null); // Store process owner from Create Process modal
   const [isNewProcess, setIsNewProcess] = useState(false); // Track if this is a new process from Create Process modal
+  const [editingProcessId, setEditingProcessId] = useState(null); // Track which process is being renamed
+  const [editingProcessName, setEditingProcessName] = useState(''); // Store the new name while editing
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false); // Track Create Process modal state
   
   const formViewRef = useRef(null); // Ref for FormView to access save method
   const fileUploadRef = useRef(null); // Ref for FileUpload to trigger upload programmatically
@@ -112,10 +116,19 @@ function EditorPage() {
 
   // Process pending file once editor is ready
   useEffect(() => {
+    console.log('📊 Pending file effect triggered:', {
+      hasPendingFile: !!pendingHeaderFile,
+      fileName: pendingHeaderFile?.name,
+      editorReady,
+      willProcess: !!(pendingHeaderFile && editorReady)
+    });
+    
     if (pendingHeaderFile && editorReady) {
-      console.log('Editor ready, processing file:', pendingHeaderFile.name);
+      console.log('✅ Editor ready, processing file:', pendingHeaderFile.name);
       handleFileUpload(pendingHeaderFile);
       setPendingHeaderFile(null);
+    } else if (pendingHeaderFile && !editorReady) {
+      console.log('⏳ File pending, waiting for editor to be ready...');
     }
   }, [pendingHeaderFile, editorReady]);
 
@@ -582,6 +595,158 @@ function EditorPage() {
       });
   };
 
+  // Handle double-click to start editing process name
+  const handleStartEditingName = (item, e) => {
+    e.stopPropagation();
+    setEditingProcessId(item.id);
+    setEditingProcessName(item.name);
+  };
+
+  // Handle saving edited process name
+  const handleSaveProcessName = async (processId) => {
+    if (!editingProcessName.trim()) {
+      alert('Process name cannot be empty');
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:3001/api/diagrams/${processId}/name`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: editingProcessName.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update process name');
+      }
+
+      // Reload process list to show updated name
+      loadProcessList();
+      
+      // Clear editing state
+      setEditingProcessId(null);
+      setEditingProcessName('');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to update process name. Please try again.');
+    }
+  };
+
+  // Handle canceling name edit
+  const handleCancelEditingName = () => {
+    setEditingProcessId(null);
+    setEditingProcessName('');
+  };
+
+  // Handle deleting a process
+  const handleDeleteProcess = async (item, e) => {
+    e.stopPropagation();
+
+    const confirmMessage = `Are you sure you want to delete "${item.name}"?\n\nThis action cannot be undone.`;
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:3001/api/diagrams/${item.id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete process');
+      }
+
+      // If the deleted process was active, clear the active state
+      if (item.id === activeProcessId) {
+        setActiveProcessId(null);
+        setDiagramXml(null);
+        setLastSavedId(null);
+      }
+
+      // Reload process list
+      loadProcessList();
+      
+      alert('Process deleted successfully!');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to delete process. Please try again.');
+    }
+  };
+
+  // Handle opening Create Process modal
+  const handleCreateProcess = () => {
+    setIsCreateModalOpen(true);
+  };
+
+  // Handle closing Create Process modal
+  const handleCreateModalClose = () => {
+    setIsCreateModalOpen(false);
+  };
+
+  // Handle Create Process modal continue
+  const handleCreateModalContinue = (data) => {
+    const { processName, ownerName, file } = data;
+
+    console.log('🚀 Create Process Modal Continue:', {
+      processName,
+      ownerName,
+      hasFile: !!file,
+      fileName: file?.name
+    });
+
+    if (file) {
+      // If file is uploaded, set pending file and metadata
+      console.log('📁 Creating process with file:', file.name);
+      console.log('   - Current editorReady state:', editorReady);
+      console.log('   - Setting pendingHeaderFile...');
+      
+      setPendingHeaderFile(file);
+      processedFileRef.current = file; // Mark as processed to avoid re-processing
+      setPendingProcessName(processName);
+      setPendingProcessOwner(ownerName);
+      setIsNewFileUpload(true);
+      setCurrentView('diagram'); // Show diagram view for file upload
+      
+      console.log('   - File upload state set. Editor will process when ready.');
+    } else {
+      // If no file, create empty diagram
+      console.log('📝 Creating empty process:', processName);
+      const emptyXml = `<mxfile host="app.diagrams.net" modified="${new Date().toISOString()}" agent="Victrex Flowstudio" version="21.1.2" etag="${Date.now()}" type="device">
+  <diagram name="Page-1" id="page-${Date.now()}">
+    <mxGraphModel dx="1422" dy="794" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>`;
+      
+      console.log('✅ Setting empty diagram XML (length:', emptyXml.length, ')');
+      console.log('✅ Setting pendingProcessName:', processName);
+      console.log('✅ Setting pendingProcessOwner:', ownerName);
+      
+      setPendingProcessName(processName);
+      setPendingProcessOwner(ownerName);
+      setIsNewProcess(true);
+      setIsNewFileUpload(true);
+      setLastSavedId(null);
+      setActiveProcessId(null);
+      setDiagramXml(emptyXml);
+      setCurrentView('diagram'); // Start with diagram view (can switch to form to add steps)
+      
+      console.log('✅ Empty process setup complete. You should now see the diagram editor.');
+    }
+    
+    // Close the modal
+    console.log('✅ Closing Create Process modal');
+    setIsCreateModalOpen(false);
+  };
+
   return (
     <>
       {/* Hidden FileUpload component for programmatic triggering from header */}
@@ -657,7 +822,32 @@ function EditorPage() {
                 }
               >
                 <div onClick={() => handleSelectProcess(item)}>
-                  <div className="process-list-name">{item.name}</div>
+                  {editingProcessId === item.id ? (
+                    <input
+                      type="text"
+                      className="process-name-input"
+                      value={editingProcessName}
+                      onChange={(e) => setEditingProcessName(e.target.value)}
+                      onBlur={() => handleSaveProcessName(item.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleSaveProcessName(item.id);
+                        } else if (e.key === 'Escape') {
+                          handleCancelEditingName();
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      autoFocus
+                    />
+                  ) : (
+                    <div 
+                      className="process-list-name"
+                      onDoubleClick={(e) => handleStartEditingName(item, e)}
+                      title="Double-click to rename"
+                    >
+                      {item.name}
+                    </div>
+                  )}
                   {item.processOwner && (
                     <div className="process-list-owner">
                       Owner: {item.processOwner}
@@ -692,6 +882,13 @@ function EditorPage() {
                   >
                     <i className="fa fa-edit"></i>
                   </button>
+                  <button
+                    className="process-action-button delete-button"
+                    onClick={(e) => handleDeleteProcess(item, e)}
+                    title="Delete Process"
+                  >
+                    <i className="fa fa-trash-alt"></i>
+                  </button>
                 </div>
               </li>
             ))}
@@ -699,10 +896,30 @@ function EditorPage() {
         </aside>
 
         <div className="editor-main">
-          {currentView === 'diagram' ? (
+          {!diagramXml && !activeProcessId && !pendingHeaderFile && processList.length === 0 ? (
+            <div className="editor-empty-state">
+              <div className="empty-state-content">
+                <i className="fa fa-folder-open empty-state-icon"></i>
+                <h2>No Processes Available</h2>
+                <p>Get started by creating your first process or uploading a diagram.</p>
+                <div className="empty-state-actions">
+                  <button
+                    className="btn-create-process"
+                    onClick={handleCreateProcess}
+                  >
+                    <i className="fa fa-plus-circle"></i>
+                    <span>Create Process</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : currentView === 'diagram' ? (
             <DrawIOEditor
               diagramXml={diagramXml}
-              onReady={() => setEditorReady(true)}
+              onReady={() => {
+                console.log('✅ DrawIOEditor is ready!');
+                setEditorReady(true);
+              }}
               onExport={handleExport}
               saveRequestId={saveRequestId}
               convertRequestId={convertRequestId}
@@ -721,6 +938,12 @@ function EditorPage() {
           )}
         </div>
       </div>
+
+      <CreateProcessModal 
+        isOpen={isCreateModalOpen}
+        onClose={handleCreateModalClose}
+        onContinue={handleCreateModalContinue}
+      />
     </>
   );
 }
