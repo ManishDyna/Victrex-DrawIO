@@ -75,19 +75,70 @@ const diagramSchema = new mongoose.Schema(
 
 const Diagram = mongoose.model('Diagram', diagramSchema);
 
-// Connect to MongoDB once at startup
+// Connect to MongoDB - optimized for both local and serverless
 mongoose
   .connect(MONGODB_URI, {
-    serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
-    socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+    serverSelectionTimeoutMS: 10000, // Increased for serverless
+    socketTimeoutMS: 45000,
+    maxPoolSize: 1, // Limit connections for serverless
+    minPoolSize: 0, // Allow connection pool to close
   })
   .then(() => {
-    console.log('Connected to MongoDB');
+    console.log('✅ Connected to MongoDB');
   })
   .catch((err) => {
-    console.error('MongoDB connection error:', err.message);
+    console.error('❌ MongoDB connection error:', err.message);
     console.error('Full error:', err);
+    // Don't exit - let serverless function handle reconnection
   });
+
+// Helper function to ensure MongoDB is connected (handles serverless cold starts)
+const ensureMongoConnection = async () => {
+  // If already connected, return immediately
+  if (mongoose.connection.readyState === 1) {
+    return true;
+  }
+
+  // If connecting (state 2), wait for it to complete
+  if (mongoose.connection.readyState === 2) {
+    console.log('⏳ MongoDB is connecting, waiting...');
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('MongoDB connection timeout'));
+      }, 10000); // 10 second timeout
+
+      mongoose.connection.once('connected', () => {
+        clearTimeout(timeout);
+        console.log('✅ MongoDB connected after wait');
+        resolve(true);
+      });
+
+      mongoose.connection.once('error', (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+    });
+  }
+
+  // If disconnected (state 0), try to connect
+  if (mongoose.connection.readyState === 0) {
+    console.log('🔄 MongoDB disconnected, attempting to connect...');
+    try {
+      await mongoose.connect(MONGODB_URI, {
+        serverSelectionTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
+        maxPoolSize: 1, // Important for serverless
+      });
+      console.log('✅ MongoDB connected');
+      return true;
+    } catch (err) {
+      console.error('❌ MongoDB connection failed:', err.message);
+      throw err;
+    }
+  }
+
+  return false;
+};
 
 // ---- Middleware -----------------------------------------------------------
 
@@ -137,9 +188,13 @@ app.use(express.static(DRAWIO_WEBAPP_PATH));
  */
 app.put('/api/diagrams/:id', async (req, res) => {
   try {
-    if (mongoose.connection.readyState !== 1) {
+    // Ensure MongoDB is connected (waits if connecting)
+    try {
+      await ensureMongoConnection();
+    } catch (err) {
       return res.status(503).json({ 
-        error: 'Database not connected. Please check MongoDB connection.' 
+        error: 'Database not connected. Please check MongoDB connection.',
+        details: err.message
       });
     }
 
@@ -241,10 +296,13 @@ app.put('/api/diagrams/:id', async (req, res) => {
  */
 app.post('/api/diagrams', async (req, res) => {
   try {
-    // Check if MongoDB is connected
-    if (mongoose.connection.readyState !== 1) {
+    // Ensure MongoDB is connected (waits if connecting)
+    try {
+      await ensureMongoConnection();
+    } catch (err) {
       return res.status(503).json({ 
-        error: 'Database not connected. Please check MongoDB connection.' 
+        error: 'Database not connected. Please check MongoDB connection.',
+        details: err.message
       });
     }
 
@@ -362,12 +420,15 @@ app.get('/api/diagrams', async (req, res) => {
     console.log('📥 GET /api/diagrams - Request received');
     console.log('   MongoDB connection state:', mongoose.connection.readyState);
     
-    // Check if MongoDB is connected
-    if (mongoose.connection.readyState !== 1) {
-      console.error('❌ MongoDB not connected. State:', mongoose.connection.readyState);
+    // Ensure MongoDB is connected (waits if connecting)
+    try {
+      await ensureMongoConnection();
+    } catch (err) {
+      console.error('❌ Failed to connect to MongoDB:', err.message);
       return res.status(503).json({ 
         error: 'Database not connected. Please check MongoDB connection.',
-        connectionState: mongoose.connection.readyState
+        connectionState: mongoose.connection.readyState,
+        details: err.message
       });
     }
 
@@ -400,10 +461,13 @@ app.get('/api/diagrams', async (req, res) => {
  */
 app.get('/api/diagrams/:id', async (req, res) => {
   try {
-    // Check if MongoDB is connected
-    if (mongoose.connection.readyState !== 1) {
+    // Ensure MongoDB is connected (waits if connecting)
+    try {
+      await ensureMongoConnection();
+    } catch (err) {
       return res.status(503).json({ 
-        error: 'Database not connected. Please check MongoDB connection.' 
+        error: 'Database not connected. Please check MongoDB connection.',
+        details: err.message
       });
     }
 
@@ -460,6 +524,16 @@ app.get('/api/diagrams/:id', async (req, res) => {
  */
 app.get('/api/diagrams/:id/parsed', async (req, res) => {
   try {
+    // Ensure MongoDB is connected (waits if connecting)
+    try {
+      await ensureMongoConnection();
+    } catch (err) {
+      return res.status(503).json({ 
+        error: 'Database not connected. Please check MongoDB connection.',
+        details: err.message
+      });
+    }
+
     const { id } = req.params;
     const doc = await Diagram.findById(id).select('parsedData name');
 
@@ -490,10 +564,13 @@ app.get('/api/diagrams/:id/parsed', async (req, res) => {
  */
 app.patch('/api/diagrams/:id', async (req, res) => {
   try {
-    // Check if MongoDB is connected
-    if (mongoose.connection.readyState !== 1) {
+    // Ensure MongoDB is connected (waits if connecting)
+    try {
+      await ensureMongoConnection();
+    } catch (err) {
       return res.status(503).json({ 
-        error: 'Database not connected. Please check MongoDB connection.' 
+        error: 'Database not connected. Please check MongoDB connection.',
+        details: err.message
       });
     }
 
@@ -652,10 +729,13 @@ app.patch('/api/diagrams/:id', async (req, res) => {
  */
 app.patch('/api/diagrams/:id/name', async (req, res) => {
   try {
-    // Check if MongoDB is connected
-    if (mongoose.connection.readyState !== 1) {
+    // Ensure MongoDB is connected (waits if connecting)
+    try {
+      await ensureMongoConnection();
+    } catch (err) {
       return res.status(503).json({ 
-        error: 'Database not connected. Please check MongoDB connection.' 
+        error: 'Database not connected. Please check MongoDB connection.',
+        details: err.message
       });
     }
 
@@ -695,10 +775,13 @@ app.patch('/api/diagrams/:id/name', async (req, res) => {
  */
 app.delete('/api/diagrams/:id', async (req, res) => {
   try {
-    // Check if MongoDB is connected
-    if (mongoose.connection.readyState !== 1) {
+    // Ensure MongoDB is connected (waits if connecting)
+    try {
+      await ensureMongoConnection();
+    } catch (err) {
       return res.status(503).json({ 
-        error: 'Database not connected. Please check MongoDB connection.' 
+        error: 'Database not connected. Please check MongoDB connection.',
+        details: err.message
       });
     }
 
@@ -738,6 +821,16 @@ app.delete('/api/diagrams/:id', async (req, res) => {
  */
 app.put('/api/diagrams/:id/rebuild', async (req, res) => {
   try {
+    // Ensure MongoDB is connected (waits if connecting)
+    try {
+      await ensureMongoConnection();
+    } catch (err) {
+      return res.status(503).json({ 
+        error: 'Database not connected. Please check MongoDB connection.',
+        details: err.message
+      });
+    }
+
     const { id } = req.params;
     const { nodes, connections, diagramId } = req.body;
 
