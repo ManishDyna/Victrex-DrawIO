@@ -359,10 +359,15 @@ app.post('/api/diagrams', async (req, res) => {
  */
 app.get('/api/diagrams', async (req, res) => {
   try {
+    console.log('📥 GET /api/diagrams - Request received');
+    console.log('   MongoDB connection state:', mongoose.connection.readyState);
+    
     // Check if MongoDB is connected
     if (mongoose.connection.readyState !== 1) {
+      console.error('❌ MongoDB not connected. State:', mongoose.connection.readyState);
       return res.status(503).json({ 
-        error: 'Database not connected. Please check MongoDB connection.' 
+        error: 'Database not connected. Please check MongoDB connection.',
+        connectionState: mongoose.connection.readyState
       });
     }
 
@@ -799,9 +804,15 @@ app.put('/api/diagrams/:id/rebuild', async (req, res) => {
 
 // ---- Start server --------------------------------------------------------
 
-app.listen(PORT, () => {
-  console.log(`Draw.io server running at http://localhost:${PORT}`);
-  console.log(`Serving files from: ${DRAWIO_WEBAPP_PATH}`);
-});
+// For local development
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Draw.io server running at http://localhost:${PORT}`);
+    console.log(`Serving files from: ${DRAWIO_WEBAPP_PATH}`);
+  });
+}
+
+// Export for Vercel serverless functions
+module.exports = app;
 
 
