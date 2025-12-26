@@ -1,4 +1,4 @@
-# Business Process Management System
+# Victrex Flowstudio
 
 A custom React application that embeds draw.io as an editor with custom file upload and persistence to MongoDB, tailored for business process management.
 

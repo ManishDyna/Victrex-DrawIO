@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, forwardRef, useImperativeHandle } from 'react';
 
 /**
  * FileUpload Component
@@ -12,8 +12,15 @@ import { useRef } from 'react';
  *    - Text files (.drawio, .xml, .mxfile) are read as text
  *    - Binary files (.vsdx) are read as ArrayBuffer
  */
-function FileUpload({ onFileSelect, disabled }) {
+const FileUpload = forwardRef(({ onFileSelect, disabled }, ref) => {
   const fileInputRef = useRef(null);
+
+  // Expose trigger method to parent component
+  useImperativeHandle(ref, () => ({
+    triggerUpload: () => {
+      fileInputRef.current?.click();
+    }
+  }));
 
   const handleFileChange = (event) => {
     const file = event.target.files?.[0];
@@ -43,27 +50,18 @@ function FileUpload({ onFileSelect, disabled }) {
   };
 
   return (
-    <div className="file-upload">
+    <div className="file-upload" style={{ display: 'none' }}>
       <input
         ref={fileInputRef}
         type="file"
         accept=".drawio,.xml,.mxfile,.vsdx,.vsd"
         onChange={handleFileChange}
-        style={{ display: 'none' }}
       />
-      <button
-        onClick={handleButtonClick}
-        disabled={disabled}
-        className="upload-button"
-      >
-        {disabled ? 'Loading Editor...' : 'Upload Diagram'}
-      </button>
-      {disabled && (
-        <p className="upload-hint">Please wait for the editor to load...</p>
-      )}
     </div>
   );
-}
+});
+
+FileUpload.displayName = 'FileUpload';
 
 export default FileUpload;
 

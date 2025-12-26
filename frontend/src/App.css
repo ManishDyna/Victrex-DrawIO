@@ -95,6 +95,10 @@ body {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+.nav-link i {
+  margin-right: 0.4rem;
+}
+
 .app-content {
   display: flex;
   flex-direction: column;
@@ -232,10 +236,18 @@ body {
 
 .process-list-item {
   padding: 0.875rem 1.25rem;
-  cursor: pointer;
   border-bottom: 1px solid var(--border);
   transition: all 0.15s ease;
   position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.process-list-item > div:first-child {
+  flex: 1;
+  cursor: pointer;
 }
 
 .process-list-item::before {
@@ -284,6 +296,43 @@ body {
 .process-list-meta {
   font-size: 0.75rem;
   color: var(--text-secondary);
+}
+
+.process-list-owner {
+  font-size: 0.8rem;
+  color: var(--victrex-blue);
+  font-weight: 500;
+  margin: 0.15rem 0;
+}
+
+.process-list-actions {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.process-action-button {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.9rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: transparent;
+}
+
+.process-action-button:hover {
+  transform: scale(1.15);
+}
+
+.process-action-button.view-button:hover {
+  background-color: var(--victrex-light-blue);
+}
+
+.process-action-button.edit-button:hover {
+  background-color: var(--victrex-lime);
 }
 
 /* Editor Main */
@@ -359,8 +408,8 @@ body {
 }
 
 .history-row {
-  cursor: pointer;
   transition: all 0.15s ease;
+  cursor: pointer;
 }
 
 .history-row:hover {
@@ -368,8 +417,33 @@ body {
   transform: translateX(2px);
 }
 
-.history-row:active {
-  background-color: rgba(0, 143, 208, 0.05);
+.history-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.action-button {
+  padding: 0.4rem 0.75rem;
+  font-size: 1.1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background-color: var(--bg-secondary);
+}
+
+.action-button:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 4px var(--shadow);
+}
+
+.view-button:hover {
+  background-color: var(--victrex-light-blue);
+}
+
+.edit-button:hover {
+  background-color: var(--victrex-lime);
 }
 
 /* Loading and Error States */

@@ -29,6 +29,7 @@ function EditorPage() {
   const [currentView, setCurrentView] = useState('diagram'); // 'diagram' or 'form'
   
   const formViewRef = useRef(null); // Ref for FormView to access save method
+  const fileUploadRef = useRef(null); // Ref for FileUpload to trigger upload programmatically
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -61,10 +62,36 @@ function EditorPage() {
     loadProcessList();
   }, []);
 
+  // Auto-trigger upload when navigating from header with action=upload
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const action = params.get('action');
+    
+    if (action === 'upload' && editorReady && fileUploadRef.current) {
+      // Remove the action parameter from URL to prevent re-triggering
+      params.delete('action');
+      const newSearch = params.toString();
+      navigate(`/editor${newSearch ? '?' + newSearch : ''}`, { replace: true });
+      
+      // Trigger the file upload dialog
+      setTimeout(() => {
+        fileUploadRef.current?.triggerUpload();
+      }, 100);
+    }
+  }, [location.search, editorReady, navigate]);
+
   // If navigated from history with a diagram ID, load it from backend
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const diagramId = params.get('id');
+    const viewParam = params.get('view'); // Check for view parameter
+
+    // Set initial view based on URL parameter
+    if (viewParam === 'form') {
+      setCurrentView('form');
+    } else if (viewParam === 'diagram') {
+      setCurrentView('diagram');
+    }
 
     if (diagramId) {
       fetch(`http://localhost:3001/api/diagrams/${diagramId}`)
@@ -506,9 +533,14 @@ function EditorPage() {
 
   return (
     <>
-      <div className="upload-section">
-        <FileUpload onFileSelect={handleFileUpload} disabled={!editorReady} />
+      {/* Hidden FileUpload component for programmatic triggering from header */}
+      <FileUpload 
+        ref={fileUploadRef}
+        onFileSelect={handleFileUpload} 
+        disabled={!editorReady} 
+      />
 
+      <div className="upload-section">
         <button
           type="button"
           className="upload-button"
@@ -558,13 +590,43 @@ function EditorPage() {
                     ? 'process-list-item process-list-item-active'
                     : 'process-list-item'
                 }
-                onClick={() => handleSelectProcess(item)}
               >
-                <div className="process-list-name">{item.name}</div>
-                <div className="process-list-meta">
-                  {item.updatedAt
-                    ? new Date(item.updatedAt).toLocaleString()
-                    : ''}
+                <div onClick={() => handleSelectProcess(item)}>
+                  <div className="process-list-name">{item.name}</div>
+                  {item.processOwner && (
+                    <div className="process-list-owner">
+                      Owner: {item.processOwner}
+                    </div>
+                  )}
+                  <div className="process-list-meta">
+                    {item.updatedAt
+                      ? new Date(item.updatedAt).toLocaleString()
+                      : ''}
+                  </div>
+                </div>
+                <div className="process-list-actions">
+                  <button
+                    className="process-action-button view-button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectProcess(item);
+                      setCurrentView('diagram');
+                    }}
+                    title="View Diagram"
+                  >
+                    <i className="fa fa-eye"></i>
+                  </button>
+                  <button
+                    className="process-action-button edit-button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectProcess(item);
+                      setCurrentView('form');
+                    }}
+                    title="Edit Form"
+                  >
+                    <i className="fa fa-edit"></i>
+                  </button>
                 </div>
               </li>
             ))}

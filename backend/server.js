@@ -367,7 +367,7 @@ app.get('/api/diagrams', async (req, res) => {
 
     const diagrams = await Diagram.find(
       {},
-      'name sourceFileName createdAt updatedAt'
+      'name sourceFileName processOwner createdAt updatedAt'
     )
       .sort({ createdAt: -1 })
       .limit(100);
@@ -377,6 +377,7 @@ app.get('/api/diagrams', async (req, res) => {
         id: d._id,
         name: d.name,
         sourceFileName: d.sourceFileName,
+        processOwner: d.processOwner,
         createdAt: d.createdAt,
         updatedAt: d.updatedAt,
       }))

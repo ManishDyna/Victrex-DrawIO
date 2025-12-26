@@ -11,7 +11,7 @@ function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>Business Process Management System</h1>
+        <h1>Victrex Flowstudio</h1>
         <nav className="app-nav">
           <NavLink
             to="/"
@@ -20,22 +20,23 @@ function App() {
               isActive ? 'nav-link nav-link-active' : 'nav-link'
             }
           >
-            Editor
+            Available Processes
           </NavLink>
           <NavLink
-            to="/history"
+            to="/editor?action=upload"
             className={({ isActive }) =>
               isActive ? 'nav-link nav-link-active' : 'nav-link'
             }
           >
-            History
+            <i className="fa fa-upload"></i> Upload Diagram
           </NavLink>
         </nav>
       </header>
 
       <main className="app-content">
         <Routes>
-          <Route path="/" element={<EditorPage />} />
+          <Route path="/" element={<HistoryPage />} />
+          <Route path="/editor" element={<EditorPage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/form/:id" element={<FormView />} />
         </Routes>
