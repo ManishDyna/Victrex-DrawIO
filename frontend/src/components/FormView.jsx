@@ -75,6 +75,10 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
                   if (!sub.parent) {
                     sub.parent = subIndex === 0 ? 'main' : `subprocess-${subIndex - 1}`;
                   }
+                  // Assign unique ID if not present (for stable React keys)
+                  if (!sub.id && !sub.branchId) {
+                    sub.id = `loaded-${nodeIndex}-${subIndex}-${Date.now()}`;
+                  }
                   return sub;
                 });
               
@@ -203,23 +207,35 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
   };
 
   // Handle subprocess change
-  // subprocessIndex is the index in the current node.subprocesses array (already merged)
-  const handleSubprocessChange = (nodeId, subprocessIndex, field, value) => {
-    console.log(`🔄 handleSubprocessChange: nodeId=${nodeId}, subprocessIndex=${subprocessIndex}, field=${field}, value="${value}"`);
+  // subprocessIndex is the index in the USER-ADDED subprocesses array ONLY (not the merged display array)
+  // This is critical because node.subprocesses in state only contains user-added ones
+  const handleSubprocessChange = (nodeId, userSubprocessIndex, field, value) => {
+    console.log(`🔄 handleSubprocessChange: nodeId=${nodeId}, userSubprocessIndex=${userSubprocessIndex}, field=${field}, value="${value}"`);
     
     setNodes(prevNodes => {
       return prevNodes.map(node => {
         if (node.id !== nodeId) return node;
         
-        const currentSubprocesses = node.subprocesses || [];
+        // CRITICAL: node.subprocesses in state contains ONLY user-added subprocesses
+        // NOT the merged array with detected subprocesses
+        const userAddedSubprocesses = node.subprocesses || [];
         
-        if (subprocessIndex < 0 || subprocessIndex >= currentSubprocesses.length) {
-          console.warn(`⚠️  Invalid subprocess index ${subprocessIndex} for node ${nodeId}`);
+        if (userSubprocessIndex < 0 || userSubprocessIndex >= userAddedSubprocesses.length) {
+          console.warn(`⚠️  Invalid user subprocess index ${userSubprocessIndex} for node ${nodeId}`, {
+            userSubprocessIndex,
+            userAddedLength: userAddedSubprocesses.length,
+            field,
+            value,
+            userAddedSubprocesses: userAddedSubprocesses.map((s, i) => ({
+              index: i,
+              name: typeof s === 'string' ? s : s.name,
+              id: typeof s === 'object' ? s.id : null
+            }))
+          });
           return node;
         }
         
-        const subprocess = currentSubprocesses[subprocessIndex];
-        const isDetected = subprocess.isDetected || false;
+        const subprocess = userAddedSubprocesses[userSubprocessIndex];
         
         // Create updated subprocess
         const updatedSubprocess = {
@@ -227,11 +243,11 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
           [field]: value
         };
         
-        console.log(`   Updated subprocess[${subprocessIndex}] ${field}="${value}", isDetected=${isDetected}`);
+        console.log(`   Updated user subprocess[${userSubprocessIndex}] ${field}="${value}"`);
         
         // Replace the subprocess at the index
-        const updatedSubprocesses = [...currentSubprocesses];
-        updatedSubprocesses[subprocessIndex] = updatedSubprocess;
+        const updatedSubprocesses = [...userAddedSubprocesses];
+        updatedSubprocesses[userSubprocessIndex] = updatedSubprocess;
         
         return { ...node, subprocesses: updatedSubprocesses };
       });
@@ -249,11 +265,28 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
         // Get ALL current subprocesses (including detected ones in the merged list)
         const allSubprocesses = node.subprocesses || [];
         
-        // Calculate default parent based on the total number of displayed subprocesses
+        // Calculate default parent based on the NEW index that will be assigned
+        // The new subprocess will be at index allSubprocesses.length
         let defaultParent = 'main';
         if (allSubprocesses.length > 0) {
-          // Connect to the last subprocess
-          defaultParent = `subprocess-${allSubprocesses.length - 1}`;
+          // Connect to the last subprocess (which is at index length - 1)
+          // But the parent reference should be to the last existing subprocess
+          // Find the last subprocess that has a name (non-empty)
+          let lastValidIndex = allSubprocesses.length - 1;
+          while (lastValidIndex >= 0) {
+            const sub = allSubprocesses[lastValidIndex];
+            const subName = typeof sub === 'string' ? sub : (sub.name || '');
+            if (subName && subName.trim()) {
+              break;
+            }
+            lastValidIndex--;
+          }
+          
+          if (lastValidIndex >= 0) {
+            defaultParent = `subprocess-${lastValidIndex}`;
+          } else {
+            defaultParent = 'main';
+          }
         }
         
         console.log(`➕ Adding new subprocess to node "${nodeId}":`, {
@@ -263,11 +296,14 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
         });
         
         // Add new empty subprocess at the end
+        // Generate a unique ID for this subprocess to ensure stable React keys
+        const uniqueId = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const newSubprocess = { 
           name: '', 
           shape: 'rectangle',
           parent: defaultParent,
-          isDetected: false // Mark as user-added
+          isDetected: false, // Mark as user-added
+          id: uniqueId // Add unique ID for stable React keys
         };
         
         const updatedSubprocesses = [...allSubprocesses, newSubprocess];
@@ -283,46 +319,51 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
   };
 
   // Remove subprocess - works for both detected and user-added subprocesses
-  const handleRemoveSubprocess = (nodeId, subprocessIndex) => {
-    console.log(`🗑️ handleRemoveSubprocess: nodeId=${nodeId}, subprocessIndex=${subprocessIndex}`);
+  // For detected subprocesses, mark them as deleted
+  // For user-added subprocesses, remove from the array
+  // subprocessIndex is in the MERGED display array
+  const handleRemoveSubprocess = (nodeId, mergedIndex, isDetected, subprocessName) => {
+    console.log(`🗑️ handleRemoveSubprocess: nodeId=${nodeId}, mergedIndex=${mergedIndex}, isDetected=${isDetected}, name="${subprocessName}"`);
     
-    setNodes(prevNodes => {
-      const updatedNodes = prevNodes.map(node => {
-        if (node.id !== nodeId) return node;
-        
-        // Get current subprocesses for this node
-        const currentSubprocesses = node.subprocesses || [];
-        
-        if (subprocessIndex < 0 || subprocessIndex >= currentSubprocesses.length) {
-          console.warn(`⚠️  Invalid subprocess index ${subprocessIndex} for node ${nodeId}`);
-          return node;
-        }
-        
-        const subprocessToDelete = currentSubprocesses[subprocessIndex];
-        const subprocessName = (subprocessToDelete.name || '').trim().toLowerCase();
-        const isDetected = subprocessToDelete.isDetected || false;
-        
-        console.log(`   Removing subprocess: "${subprocessToDelete.name}", isDetected=${isDetected}`);
-        
-        if (isDetected) {
-          // It's a detected subprocess (branch node) - mark as deleted
-          // Don't remove from array, just mark in deletedSubprocessNames
-          setDeletedSubprocessNames(prev => {
-            const newSet = new Set([...prev, subprocessName]);
-            console.log(`   Marked "${subprocessName}" as deleted. Deleted list:`, Array.from(newSet));
-            return newSet;
-          });
-          return node; // Return unchanged node - the filtering happens in nodesWithBranches
-        } else {
-          // It's a user-added subprocess - remove from node.subprocesses
-          const updatedSubprocesses = currentSubprocesses.filter((_, idx) => idx !== subprocessIndex);
-          console.log(`   Removed user-added subprocess. Remaining: ${updatedSubprocesses.length}`);
-          return { ...node, subprocesses: updatedSubprocesses };
-        }
+    if (isDetected) {
+      // It's a detected subprocess (branch node) - mark as deleted
+      const normalizedName = (subprocessName || '').trim().toLowerCase();
+      setDeletedSubprocessNames(prev => {
+        const newSet = new Set([...prev, normalizedName]);
+        console.log(`   Marked "${normalizedName}" as deleted. Deleted list:`, Array.from(newSet));
+        return newSet;
       });
-      
-      return updatedNodes;
-    });
+    } else {
+      // It's a user-added subprocess - remove from node.subprocesses
+      // Need to calculate the correct index in the user-added array
+      setNodes(prevNodes => {
+        return prevNodes.map(node => {
+          if (node.id !== nodeId) return node;
+          
+          const userAddedSubprocesses = node.subprocesses || [];
+          
+          // Find the subprocess by ID or name to remove
+          const indexToRemove = userAddedSubprocesses.findIndex(sub => {
+            const subObj = typeof sub === 'string' ? { name: sub } : sub;
+            const subName = (subObj.name || '').trim();
+            const subId = subObj.id;
+            
+            // Match by name (case-insensitive) or by ID
+            return subName.toLowerCase() === subprocessName.toLowerCase() || 
+                   (subId && mergedIndex >= 0); // Use index as fallback
+          });
+          
+          if (indexToRemove === -1) {
+            console.warn(`   Could not find user subprocess to remove: "${subprocessName}"`);
+            return node;
+          }
+          
+          const updatedSubprocesses = userAddedSubprocesses.filter((_, idx) => idx !== indexToRemove);
+          console.log(`   Removed user-added subprocess at index ${indexToRemove}. Remaining: ${updatedSubprocesses.length}`);
+          return { ...node, subprocesses: updatedSubprocesses };
+        });
+      });
+    }
   };
 
   // Save changes
@@ -813,6 +854,10 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
                           if (!subObj.parent) {
                             subObj.parent = subIndex === 0 ? 'main' : `subprocess-${subIndex - 1}`;
                           }
+                          // Assign unique ID if not present (for stable React keys)
+                          if (!subObj.id && !subObj.branchId) {
+                            subObj.id = `refreshed-${nodeIndex}-${subIndex}-${Date.now()}`;
+                          }
                           return subObj;
                         });
                         return {
@@ -987,21 +1032,40 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
                         </label>
                         {node.subprocesses && node.subprocesses.length > 0 ? (
                           <div className="subprocesses-list">
-                            {node.subprocesses.map((subprocess, subIndex) => {
+                            {node.subprocesses.map((subprocess, mergedIndex) => {
+                              // CRITICAL: node.subprocesses here is the MERGED array (detected + user-added)
+                              // But the state only contains user-added subprocesses
+                              // We need to calculate the correct index in the user-added array
+                              
+                              const isDetected = subprocess.isDetected || false;
+                              
+                              // Calculate userAddedIndex: count how many non-detected subprocesses came before this one
+                              let userAddedIndex = -1;
+                              if (!isDetected) {
+                                userAddedIndex = node.subprocesses
+                                  .slice(0, mergedIndex)
+                                  .filter(s => !(s.isDetected || false))
+                                  .length;
+                              }
+                              
                               // CRITICAL: Use a stable key that doesn't change when editing
-                              // Use branchId if available, otherwise use stable index-based key
-                              const subprocessKey = subprocess.branchId 
-                                ? `branch-${subprocess.branchId}` 
-                                : `user-${node.id}-sub-${subIndex}`;
+                              // Priority: 1. subprocess.id (for user-added), 2. branchId (for detected), 3. index-based fallback
+                              const subprocessKey = subprocess.id 
+                                ? `user-${subprocess.id}`
+                                : subprocess.branchId 
+                                  ? `branch-${subprocess.branchId}` 
+                                  : `fallback-${node.id}-sub-${mergedIndex}`;
+                              
                               // Ensure subprocess is an object with all required fields
                               const subprocessObj = typeof subprocess === 'string' 
-                                ? { name: subprocess, shape: 'rectangle', parent: subIndex === 0 ? 'main' : `subprocess-${subIndex - 1}` }
+                                ? { name: subprocess, shape: 'rectangle', parent: mergedIndex === 0 ? 'main' : `subprocess-${mergedIndex - 1}` }
                                 : { 
                                     name: subprocess.name || '', 
                                     shape: subprocess.shape || 'rectangle', 
-                                    parent: subprocess.parent || (subIndex === 0 ? 'main' : `subprocess-${subIndex - 1}`),
+                                    parent: subprocess.parent || (mergedIndex === 0 ? 'main' : `subprocess-${mergedIndex - 1}`),
                                     isDetected: subprocess.isDetected || false,
-                                    branchId: subprocess.branchId || null
+                                    branchId: subprocess.branchId || null,
+                                    id: subprocess.id || null
                                   };
                               
                               // Build parent options: main step + ALL existing subprocesses (except current one)
@@ -1011,7 +1075,7 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
                               
                               // Add ALL existing subprocesses as parent options (except the current one)
                               for (let i = 0; i < node.subprocesses.length; i++) {
-                                if (i === subIndex) continue; // Skip current subprocess
+                                if (i === mergedIndex) continue; // Skip current subprocess
                                 const existingSub = node.subprocesses[i];
                                 const existingSubObj = typeof existingSub === 'string' 
                                   ? { name: existingSub, shape: 'rectangle' } 
@@ -1033,28 +1097,40 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
                                     <input
                                       type="text"
                                       value={subprocessObj.name || ''}
-                                      onChange={(e) =>
+                                      onChange={(e) => {
+                                        if (isDetected) {
+                                          console.warn('Cannot edit detected subprocess name');
+                                          return;
+                                        }
                                         handleSubprocessChange(
                                           node.id,
-                                          subIndex,
+                                          userAddedIndex,
                                           'name',
                                           e.target.value
-                                        )
-                                      }
+                                        );
+                                      }}
                                       placeholder="Subprocess name"
                                       className="form-input subprocess-input"
+                                      disabled={isDetected}
+                                      title={isDetected ? 'Detected subprocess from editor (read-only name)' : 'Enter subprocess name'}
                                     />
                                     <select
                                       value={subprocessObj.shape || 'rectangle'}
-                                      onChange={(e) =>
+                                      onChange={(e) => {
+                                        if (isDetected) {
+                                          console.warn('Cannot edit detected subprocess shape');
+                                          return;
+                                        }
                                         handleSubprocessChange(
                                           node.id,
-                                          subIndex,
+                                          userAddedIndex,
                                           'shape',
                                           e.target.value
-                                        )
-                                      }
+                                        );
+                                      }}
                                       className="form-select subprocess-shape"
+                                      disabled={isDetected}
+                                      title={isDetected ? 'Detected subprocess from editor (read-only shape)' : 'Select subprocess shape'}
                                     >
                                       <option value="rectangle">Rectangle</option>
                                       <option value="ellipse">Circle/Ellipse</option>
@@ -1067,8 +1143,9 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
                                       type="button"
                                       className="btn-remove"
                                       onClick={() =>
-                                        handleRemoveSubprocess(node.id, subIndex)
+                                        handleRemoveSubprocess(node.id, mergedIndex, isDetected, subprocessObj.name)
                                       }
+                                      title={isDetected ? 'Hide this detected subprocess' : 'Remove this subprocess'}
                                     >
                                       ×
                                     </button>
@@ -1076,17 +1153,22 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
                                   <div className="subprocess-parent-row">
                                     <label className="subprocess-parent-label">Connect to:</label>
                                     <select
-                                      value={subprocessObj.parent || (subIndex === 0 ? 'main' : `subprocess-${subIndex - 1}`)}
-                                      onChange={(e) =>
+                                      value={subprocessObj.parent || (mergedIndex === 0 ? 'main' : `subprocess-${mergedIndex - 1}`)}
+                                      onChange={(e) => {
+                                        if (isDetected) {
+                                          console.warn('Cannot edit detected subprocess parent');
+                                          return;
+                                        }
                                         handleSubprocessChange(
                                           node.id,
-                                          subIndex,
+                                          userAddedIndex,
                                           'parent',
                                           e.target.value
-                                        )
-                                      }
+                                        );
+                                      }}
                                       className="form-select subprocess-parent"
-                                      title="Select which node this subprocess connects to"
+                                      title={isDetected ? 'Detected subprocess from editor (read-only connection)' : 'Select which node this subprocess connects to'}
+                                      disabled={isDetected}
                                     >
                                       {parentOptions.map((option) => (
                                         <option key={option.value} value={option.value}>

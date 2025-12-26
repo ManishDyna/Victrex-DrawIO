@@ -423,12 +423,12 @@ function EditorPage() {
 
   /**
    * Toggle between diagram and form view
-   * When switching to diagram view, reload the diagram to show any form changes
+   * When switching views, reload data to show latest changes
    */
   const handleViewToggle = async () => {
     const newView = currentView === 'diagram' ? 'form' : 'diagram';
     
-    // If switching to diagram view and we have an active process, reload it
+    // If switching to diagram view, reload the diagram to show form changes
     if (newView === 'diagram' && activeProcessId) {
       console.log('🔄 Switching to diagram view, reloading diagram...');
       try {
@@ -441,6 +441,12 @@ function EditorPage() {
       } catch (err) {
         console.error('Failed to reload diagram:', err);
       }
+    }
+    
+    // If switching to form view, FormView will reload via useEffect with [id] dependency
+    // But we can help by triggering a reload flag
+    if (newView === 'form') {
+      console.log('🔄 Switching to form view, it will reload latest data...');
     }
     
     setCurrentView(newView);
@@ -578,6 +584,7 @@ function EditorPage() {
           ) : (
             activeProcessId && (
               <FormView 
+                key={`form-${activeProcessId}-${currentView}`}
                 ref={formViewRef} 
                 diagramId={activeProcessId} 
                 embedded={true}
