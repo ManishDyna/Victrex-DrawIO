@@ -272,7 +272,11 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
       isNew: true // Mark as newly created in form view
     };
     
-    console.log('✅ Adding new step:', newNode);
+    console.log('✅ Adding new step:', {
+      newNode,
+      lastNode: lastNode ? { id: lastNode.id, label: lastNode.editedLabel } : null,
+      totalNodesAfter: nodes.length + 1
+    });
     
     setNodes(prevNodes => [...prevNodes, newNode]);
     
@@ -285,8 +289,17 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
         from: lastNode.id,
         to: newNodeId
       };
-      setConnections(prevConnections => [...prevConnections, newConnection]);
-      console.log('✅ Added connection from last node to new node:', newConnection);
+      setConnections(prevConnections => {
+        const updated = [...prevConnections, newConnection];
+        console.log('✅ Added connection:', {
+          connection: newConnection,
+          totalConnectionsAfter: updated.length,
+          allConnections: updated
+        });
+        return updated;
+      });
+    } else {
+      console.log('ℹ️ No previous node - this is the first step (no connection needed)');
     }
   };
   
@@ -450,6 +463,10 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
         isNew: n.isNew,
         userSubprocesses: n.subprocesses
       })));
+      console.log('   Current connections state:', {
+        count: connections.length,
+        connections: connections.map(c => ({ from: c.from, to: c.to }))
+      });
       
       // Check if any nodes are newly created in form view
       const hasNewNodes = nodes.some(n => n.isNew);
@@ -490,8 +507,17 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
         subprocessCount: n.subprocesses?.length || 0
       })));
 
-      // Use latest connections from database to preserve Editor changes
-      const latestConnections = latestDiagram.parsedData?.connections || connections;
+      // IMPORTANT: If there are new nodes, use local connections state (includes new connections)
+      // Otherwise, use latest connections from database to preserve Editor changes
+      const connectionsToSave = hasNewNodes 
+        ? connections  // Use local state with new connections
+        : (latestDiagram.parsedData?.connections || connections); // Use DB connections for existing nodes
+      
+      console.log('   Connections to save:', {
+        count: connectionsToSave.length,
+        connections: connectionsToSave,
+        source: hasNewNodes ? 'local state (with new connections)' : 'database'
+      });
       
       let response;
       
@@ -505,7 +531,7 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
           },
           body: JSON.stringify({
             nodes: updatedNodes,
-            connections: latestConnections,
+            connections: connectionsToSave,
             diagramId: latestDiagram.parsedData?.diagramId,
           }),
         });
@@ -521,7 +547,7 @@ const FormView = forwardRef(({ diagramId: propDiagramId, embedded = false, onSav
             parsedData: {
               ...latestDiagram.parsedData, // Use latest parsedData as base
               nodes: updatedNodes, // Override with FormView edits
-              connections: latestConnections, // Use latest connections
+              connections: connectionsToSave, // Use connections based on whether there are new nodes
             },
           }),
         });
